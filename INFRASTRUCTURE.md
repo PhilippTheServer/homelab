@@ -2,7 +2,7 @@
 
 ## Overview
 
-A home network built on a mini PC running Debian 13 with Docker, providing network-wide DNS filtering and DHCP via Pi-hole. All local devices route through Pi-hole for ad blocking and DNS control before reaching the internet.
+A home network built on a mini PC running Debian 13 with Docker, providing network-wide DNS filtering and DHCP via Pi-hole. All services are managed as Infrastructure as Code (Ansible + Docker Compose). Each service stack is fully self-contained with its own database — stacks can be developed, replaced, or torn down independently.
 
 ---
 
@@ -16,83 +16,159 @@ graph TD
         FB["Router + WiFi AP\nNAT / Firewall\nDHCP reservation for Mini PC"]
     end
 
-    subgraph MiniPC ["Mini PC — 192.168.178.x (reserved)"]
-        OS["Debian 13"]
-        DOCKER["Docker"]
-        PH["Pi-hole\nDNS + DHCP server\nAd blocking"]
-        OS --> DOCKER --> PH
+    subgraph MiniPC ["Mini PC — 192.168.178.x (reserved)\nDebian 13 · Docker · 16 GB RAM"]
+        Traefik["Traefik\nReverse Proxy · SSL"]
+        PH["Pi-hole\nDNS + DHCP"]
+        HS["Headscale\nVPN control plane\n+ Postgres"]
+        GL["GitLab CE\nGit · CI/CD · Registry\n+ Postgres + Redis"]
+        KC["Keycloak\nSSO / OIDC\n+ Postgres"]
+        HB["Harbor\nDocker Registry\n+ Postgres + Redis"]
     end
 
     subgraph LAN ["Local Network — 192.168.178.0/24"]
         C1["💻 Laptop"]
         C2["📱 Phone"]
-        C3["📺 Smart TV / IoT"]
+        C3["Other devices"]
     end
 
-    INET <-->|"WAN uplink"| FB
-    FB <-->|"LAN / WiFi (192.168.178.0/24)"| MiniPC
+    INET <-->|"WAN"| FB
+    FB <-->|"LAN / WiFi"| MiniPC
     FB <-->|"WiFi"| LAN
-
-    C1 & C2 & C3 -->|"DNS query"| PH
-    PH -->|"filtered upstream DNS\n(e.g. 1.1.1.1 / 8.8.8.8)"| INET
+    C1 & C2 & C3 -->|"DNS"| PH
+    PH -->|"upstream DNS"| INET
+    C1 & C2 & C3 -->|"HTTPS (*.home.domain.com)"| Traefik
+    Traefik --> GL & KC & HB & HS
 ```
 
 ---
 
-## Components
+## Service Stacks
 
-### Fritz Box
-- **Role:** Internet gateway, NAT/firewall, WiFi access point
-- **IP:** `192.168.178.1` (default Fritz Box subnet)
-- **DHCP:** Fritz Box DHCP has a static reservation for the Mini PC's MAC address, ensuring Pi-hole always gets the same IP
-- **DNS:** Configured to point to Pi-hole as the upstream DNS server for all LAN clients
+Each stack is an independent Docker Compose file with its own database. Stacks can be brought up, torn down, or replaced without affecting others.
 
-### Mini PC
-- **OS:** Debian 13
-- **Runtime:** Docker
-- **IP:** `192.168.178.x` (DHCP reservation — effectively static)
-- **Services:** Pi-hole (container)
+### Traefik
+- **Role:** Reverse proxy and SSL terminator for all internal services
+- **SSL:** Let's Encrypt wildcard cert via DNS challenge (Namecheap API)
+- **Domain:** `*.home.<domain>.com` — resolved internally by Pi-hole to Mini PC IP
+- **Compose:** `services/traefik/docker-compose.yml`
 
-### Pi-hole (Docker container)
-- **Role:** Network-wide DNS server + DHCP server
-- **DNS:** Receives all DNS queries from LAN clients, blocks ads/trackers at DNS level, forwards clean queries to upstream resolvers
-- **DHCP:** Issues IP addresses to all LAN clients (Fritz Box DHCP is disabled or Pi-hole takes precedence)
-- **Upstream DNS:** Configurable (e.g. Cloudflare `1.1.1.1`, Google `8.8.8.8`, or a local resolver like Unbound)
+### Pi-hole
+- **Role:** Network-wide DNS server + DHCP server, ad/tracker blocking
+- **Internal DNS:** Resolves `*.home.<domain>.com` → Mini PC IP (no split-DNS hairpin needed)
+- **Upstream DNS:** Cloudflare `1.1.1.1` / Google `8.8.8.8` (or local Unbound)
+- **Compose:** `services/pihole/docker-compose.yml`
+
+### GitLab CE
+- **Role:** Git hosting, CI/CD pipelines, IaC source of truth
+- **Auth:** OIDC via Keycloak
+- **Database:** Dedicated Postgres + Redis containers in the same stack
+- **Runners:** GitLab Runner container (same host, 1-2 concurrent builds)
+- **Compose:** `services/gitlab/docker-compose.yml`
+
+### Keycloak
+- **Role:** SSO identity provider — single login for GitLab, Harbor, Headscale
+- **Database:** Dedicated Postgres container in the same stack
+- **Compose:** `services/keycloak/docker-compose.yml`
+
+### Harbor
+- **Role:** Docker image registry (replaces Docker Hub for internal images)
+- **Auth:** OIDC via Keycloak
+- **Database:** Dedicated Postgres + Redis containers in the same stack
+- **Compose:** `services/harbor/docker-compose.yml`
+
+### Headscale
+- **Role:** Self-hosted Tailscale control plane — VPN mesh for remote access
+- **Auth:** OIDC via Keycloak
+- **Database:** Dedicated Postgres container in the same stack
+- **Compose:** `services/headscale/docker-compose.yml`
 
 ---
 
-## Traffic Flow
+## Infrastructure as Code
 
-### DNS Resolution
+### Tooling
+| Layer | Tool | Purpose |
+|---|---|---|
+| Host provisioning | Ansible | Install Docker, configure firewall, users, system settings |
+| Secrets | Ansible Vault | All credentials encrypted in the repo |
+| Service deployment | Docker Compose (Jinja2 templates) | Ansible renders and deploys each stack |
+| Pipeline | GitLab CI | Manages re-deploys after this initial bootstrap |
+
+### Repo Layout
 ```
-Client → Pi-hole (192.168.178.x:53)
-           ├─ Blocked domain → NXDOMAIN (ad/tracker blocked)
-           └─ Clean domain → upstream DNS → Internet → response back to client
+homelab/
+├── ansible/
+│   ├── inventory/
+│   │   └── hosts.yml
+│   ├── group_vars/all/
+│   │   ├── vars.yml          # non-secret variables (domain, IPs, versions)
+│   │   └── vault.yml         # ansible-vault encrypted (passwords, API keys)
+│   ├── roles/
+│   │   ├── common/           # Docker install, firewall (UFW), system users
+│   │   ├── traefik/
+│   │   ├── pihole/
+│   │   ├── gitlab/
+│   │   ├── keycloak/
+│   │   ├── harbor/
+│   │   └── headscale/
+│   └── site.yml
+├── services/
+│   ├── traefik/
+│   ├── pihole/
+│   ├── gitlab/
+│   ├── keycloak/
+│   ├── harbor/
+│   └── headscale/
+└── INFRASTRUCTURE.md
 ```
 
-### DHCP
+### Bootstrap Order
+Services must be brought up in dependency order on first install:
+
 ```
-New device joins network → DHCP request → Pi-hole assigns IP + sets itself as DNS server
+1. common        → Docker, UFW, system users
+2. traefik       → SSL working before any service is exposed
+3. pihole        → Internal DNS for *.home.<domain>.com
+4. keycloak      → SSO must exist before wiring other services to it
+5. gitlab        → Git + CI/CD (then push this repo to it)
+6. harbor        → Registry (GitLab CI pushes images here)
+7. headscale     → VPN (last, needs Keycloak OIDC)
 ```
 
-### General traffic
-```
-Client → Fritz Box (NAT) → Internet
-```
+After step 5, GitLab CI takes over re-deployments — Ansible is only needed for host-level changes.
 
 ---
 
-## Goals & Planned Expansions
+## Traffic Flows
 
-- [ ] **Self-hosted services** — Nextcloud, Jellyfin, Home Assistant, etc.
-- [ ] **Network security & monitoring** — traffic analysis, VLAN segmentation, firewall rules
-- [ ] **Remote access / VPN** — WireGuard or Tailscale for secure external access
-- [ ] **Learning & experimentation** — Kubernetes (k3s), CI/CD, infrastructure as code
+### HTTPS (internal browser request)
+```
+Client → Pi-hole DNS → resolves *.home.<domain>.com → Mini PC IP
+Client → Traefik (443) → routes by hostname → service container
+```
+
+### CI/CD pipeline
+```
+git push → GitLab → GitLab Runner builds image → pushes to Harbor
+GitLab CI → ansible-playbook / docker compose pull+up → service updated
+```
+
+### VPN (remote access)
+```
+External device → Headscale DERP → Tailscale mesh → Mini PC services
+```
+
+### SSO login flow
+```
+User → service login page → redirect to Keycloak → authenticate → token back to service
+```
 
 ---
 
 ## Open Questions / To Clarify
 
-- Pi-hole upstream DNS resolver (currently using default — consider adding Unbound for full local resolution)
-- Mini PC exact IP address (fill in the `x` in `192.168.178.x`)
+- Mini PC exact IP address (fill in `192.168.178.x`)
 - Fritz Box DHCP: fully disabled in favour of Pi-hole, or running alongside?
+- Pi-hole upstream DNS: default resolvers, or add Unbound for full local resolution?
+- Namecheap DNS API vs. moving DNS management to Cloudflare (better Traefik support)
+- GitLab Runner resource limits (max concurrent builds given 16 GB RAM budget)
