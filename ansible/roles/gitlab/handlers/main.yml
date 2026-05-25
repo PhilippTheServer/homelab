@@ -1,0 +1,6 @@
+---
+- name: restart gitlab
+  command:
+    cmd: docker compose up -d --remove-orphans
+    chdir: "{{ homelab_base_dir }}/services/gitlab"
+  become_user: "{{ deploy_user }}"

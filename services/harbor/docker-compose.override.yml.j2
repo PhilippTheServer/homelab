@@ -1,0 +1,19 @@
+---
+# Overlay on top of Harbor's installer-generated docker-compose.yml.
+# Adds Traefik labels and attaches Harbor's proxy to the shared proxy network.
+
+services:
+  proxy:
+    networks:
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.harbor.rule=Host(`registry.{{ internal_subdomain }}.{{ domain }}`)"
+      - "traefik.http.routers.harbor.entrypoints=websecure"
+      - "traefik.http.routers.harbor.tls.certresolver=letsencrypt"
+      - "traefik.http.services.harbor.loadbalancer.server.port=8080"
+      - "traefik.docker.network=proxy"
+
+networks:
+  proxy:
+    external: true

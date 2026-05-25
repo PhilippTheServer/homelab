@@ -1,0 +1,57 @@
+---
+services:
+
+  headscale:
+    image: headscale/headscale:{{ headscale_version }}
+    container_name: headscale
+    restart: unless-stopped
+    command: serve
+    volumes:
+      - {{ homelab_base_dir }}/services/headscale/config:/etc/headscale:ro
+      - headscale_data:/var/lib/headscale
+    depends_on:
+      headscale-db:
+        condition: service_healthy
+    networks:
+      - proxy
+      - internal
+    labels:
+      - "traefik.enable=true"
+      # Headscale lives at vpn.<domain> (public, via Cloudflare Tunnel — not under home.<domain>)
+      - "traefik.http.routers.headscale.rule=Host(`vpn.{{ domain }}`)"
+      - "traefik.http.routers.headscale.entrypoints=websecure"
+      - "traefik.http.routers.headscale.tls.certresolver=letsencrypt"
+      - "traefik.http.services.headscale.loadbalancer.server.port=8080"
+      - "traefik.docker.network=proxy"
+
+  headscale-db:
+    image: postgres:{{ postgres_version }}
+    container_name: headscale-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: headscale
+      POSTGRES_USER: headscale
+      POSTGRES_PASSWORD: "{{ vault_headscale_db_password }}"
+    volumes:
+      - headscale_db:/var/lib/postgresql/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U headscale -d headscale"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+networks:
+  proxy:
+    external: true
+  internal:
+    name: headscale_internal
+    internal: true
+
+volumes:
+  headscale_data:
+    name: headscale_data
+  headscale_db:
+    name: headscale_db

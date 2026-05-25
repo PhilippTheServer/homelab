@@ -1,0 +1,24 @@
+---
+- name: Create vaultwarden directory
+  file:
+    path: "{{ homelab_base_dir }}/services/vaultwarden"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: '0750'
+
+- name: Render docker-compose.yml
+  template:
+    src: "{{ playbook_dir }}/../services/vaultwarden/docker-compose.yml.j2"
+    dest: "{{ homelab_base_dir }}/services/vaultwarden/docker-compose.yml"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: '0640'
+  notify: restart vaultwarden
+
+- name: Ensure vaultwarden stack is running
+  command:
+    cmd: docker compose up -d --remove-orphans
+    chdir: "{{ homelab_base_dir }}/services/vaultwarden"
+  become_user: "{{ deploy_user }}"
+  changed_when: false

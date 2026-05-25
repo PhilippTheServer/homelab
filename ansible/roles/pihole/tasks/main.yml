@@ -1,0 +1,24 @@
+---
+- name: Create pihole directory
+  file:
+    path: "{{ homelab_base_dir }}/services/pihole"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: '0750'
+
+- name: Render docker-compose.yml
+  template:
+    src: "{{ playbook_dir }}/../services/pihole/docker-compose.yml.j2"
+    dest: "{{ homelab_base_dir }}/services/pihole/docker-compose.yml"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: '0640'
+  notify: restart pihole
+
+- name: Ensure pihole stack is running
+  command:
+    cmd: docker compose up -d --remove-orphans
+    chdir: "{{ homelab_base_dir }}/services/pihole"
+  become_user: "{{ deploy_user }}"
+  changed_when: false

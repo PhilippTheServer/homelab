@@ -1,0 +1,6 @@
+---
+- name: restart hcvault
+  command:
+    cmd: docker compose up -d --remove-orphans
+    chdir: "{{ homelab_base_dir }}/services/hcvault"
+  become_user: "{{ deploy_user }}"

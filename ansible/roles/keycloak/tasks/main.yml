@@ -1,0 +1,24 @@
+---
+- name: Create keycloak directory
+  file:
+    path: "{{ homelab_base_dir }}/services/keycloak"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: '0750'
+
+- name: Render docker-compose.yml
+  template:
+    src: "{{ playbook_dir }}/../services/keycloak/docker-compose.yml.j2"
+    dest: "{{ homelab_base_dir }}/services/keycloak/docker-compose.yml"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: '0640'
+  notify: restart keycloak
+
+- name: Ensure keycloak stack is running
+  command:
+    cmd: docker compose up -d --remove-orphans
+    chdir: "{{ homelab_base_dir }}/services/keycloak"
+  become_user: "{{ deploy_user }}"
+  changed_when: false

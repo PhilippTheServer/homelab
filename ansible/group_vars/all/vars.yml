@@ -1,0 +1,24 @@
+---
+# ── Network ────────────────────────────────────────────────────────────────────
+domain: "yourdomain.com"              # TODO: your public domain
+internal_subdomain: "home"            # services at *.home.yourdomain.com
+minipc_ip: "192.168.178.x"            # TODO: Mini PC LAN IP
+
+# ── Ansible / Deploy ───────────────────────────────────────────────────────────
+deploy_user: deploy
+homelab_base_dir: /opt/homelab
+
+# ── Let's Encrypt ──────────────────────────────────────────────────────────────
+traefik_acme_email: "you@example.com" # TODO: your email
+letsencrypt_staging: false            # set true during initial setup to avoid rate limits
+
+# ── Service versions (pin these, update deliberately) ──────────────────────────
+traefik_version: "v3.3"
+keycloak_version: "26.2"
+headscale_version: "0.23.0"
+hcvault_version: "1.19"
+vaultwarden_version: "1.32"
+postgres_version: "16-alpine"
+gitlab_version: "17.8.1-ce.0"
+harbor_version: "v2.12.0"
+pihole_version: "2024.07.0"

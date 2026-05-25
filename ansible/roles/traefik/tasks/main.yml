@@ -1,0 +1,24 @@
+---
+- name: Create traefik directory
+  file:
+    path: "{{ homelab_base_dir }}/services/traefik"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: '0750'
+
+- name: Render docker-compose.yml
+  template:
+    src: "{{ playbook_dir }}/../services/traefik/docker-compose.yml.j2"
+    dest: "{{ homelab_base_dir }}/services/traefik/docker-compose.yml"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: '0640'
+  notify: restart traefik
+
+- name: Ensure traefik stack is running
+  command:
+    cmd: docker compose up -d --remove-orphans
+    chdir: "{{ homelab_base_dir }}/services/traefik"
+  become_user: "{{ deploy_user }}"
+  changed_when: false

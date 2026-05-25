@@ -1,0 +1,32 @@
+---
+- name: Homelab — provision and deploy all services
+  hosts: minipc
+  become: true
+
+  roles:
+    - role: common
+      tags: [common]
+
+    - role: traefik
+      tags: [traefik]
+
+    - role: keycloak
+      tags: [keycloak]
+
+    - role: headscale
+      tags: [headscale]
+
+    - role: hcvault
+      tags: [hcvault]
+
+    - role: vaultwarden
+      tags: [vaultwarden]
+
+    - role: pihole
+      tags: [pihole]
+
+    - role: gitlab
+      tags: [gitlab]
+
+    - role: harbor
+      tags: [harbor]

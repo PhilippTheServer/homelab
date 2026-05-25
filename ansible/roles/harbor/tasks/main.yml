@@ -1,0 +1,61 @@
+---
+- name: Create harbor directory
+  file:
+    path: "{{ homelab_base_dir }}/services/harbor"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: '0750'
+
+- name: Check if Harbor installer is already extracted
+  stat:
+    path: "{{ homelab_base_dir }}/services/harbor/install.sh"
+  register: harbor_installer
+
+- name: Download Harbor offline installer
+  get_url:
+    url: "https://github.com/goharbor/harbor/releases/download/{{ harbor_version }}/harbor-offline-installer-{{ harbor_version }}.tgz"
+    dest: "/tmp/harbor-installer-{{ harbor_version }}.tgz"
+    mode: '0644'
+  when: not harbor_installer.stat.exists
+
+- name: Extract Harbor installer
+  unarchive:
+    src: "/tmp/harbor-installer-{{ harbor_version }}.tgz"
+    dest: "{{ homelab_base_dir }}/services/"
+    remote_src: true
+    extra_opts: [--strip-components=1]
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+  when: not harbor_installer.stat.exists
+
+- name: Render harbor.yml
+  template:
+    src: "{{ playbook_dir }}/../services/harbor/harbor.yml.j2"
+    dest: "{{ homelab_base_dir }}/services/harbor/harbor.yml"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: '0640'
+  register: harbor_config
+
+- name: Run Harbor prepare script
+  command:
+    cmd: ./prepare
+    chdir: "{{ homelab_base_dir }}/services/harbor"
+  when: harbor_config.changed
+
+- name: Render docker-compose.override.yml (Traefik integration)
+  template:
+    src: "{{ playbook_dir }}/../services/harbor/docker-compose.override.yml.j2"
+    dest: "{{ homelab_base_dir }}/services/harbor/docker-compose.override.yml"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: '0640'
+  notify: restart harbor
+
+- name: Ensure harbor stack is running
+  command:
+    cmd: docker compose up -d --remove-orphans
+    chdir: "{{ homelab_base_dir }}/services/harbor"
+  become_user: "{{ deploy_user }}"
+  changed_when: false

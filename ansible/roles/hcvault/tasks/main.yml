@@ -1,0 +1,36 @@
+---
+- name: Create hcvault directories
+  file:
+    path: "{{ homelab_base_dir }}/services/hcvault/{{ item }}"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: '0750'
+  loop:
+    - ""
+    - config
+
+- name: Render docker-compose.yml
+  template:
+    src: "{{ playbook_dir }}/../services/hcvault/docker-compose.yml.j2"
+    dest: "{{ homelab_base_dir }}/services/hcvault/docker-compose.yml"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: '0640'
+  notify: restart hcvault
+
+- name: Render vault.hcl config
+  template:
+    src: "{{ playbook_dir }}/../services/hcvault/vault.hcl.j2"
+    dest: "{{ homelab_base_dir }}/services/hcvault/config/vault.hcl"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: '0640'
+  notify: restart hcvault
+
+- name: Ensure hcvault stack is running
+  command:
+    cmd: docker compose up -d --remove-orphans
+    chdir: "{{ homelab_base_dir }}/services/hcvault"
+  become_user: "{{ deploy_user }}"
+  changed_when: false
