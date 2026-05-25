@@ -1,39 +1,24 @@
 ---
+# Pi-hole runs with network_mode: host — required for DHCP broadcast.
+# This means it is NOT routed through Traefik. Access the admin UI directly:
+#   http://{{ minipc_ip }}:8080
+# Traefik owns ports 80 and 443; Pi-hole web UI is on 8080 to avoid conflict.
+
 services:
 
   pihole:
-    image: pihole/pihole:{{ pihole_version }}
     container_name: pihole
-    restart: unless-stopped
+    image: pihole/pihole:{{ pihole_version }}
+    network_mode: host
     environment:
       TZ: "Europe/Berlin"
-      WEBPASSWORD: "{{ vault_pihole_webpassword }}"
-      PIHOLE_DNS_: "1.1.1.1;8.8.8.8"
-      DNSMASQ_LISTENING: "all"
-      VIRTUAL_HOST: "pihole.{{ internal_subdomain }}.{{ domain }}"
-    ports:
-      # DNS must be exposed directly — Traefik only handles HTTP/HTTPS
-      - "53:53/tcp"
-      - "53:53/udp"
+      FTLCONF_webserver_api_password: "{{ vault_pihole_webpassword }}"
+      FTLCONF_webserver_port: "8080"
+      FTLCONF_dns_listeningMode: "all"
     volumes:
-      - pihole_data:/etc/pihole
-      - pihole_dnsmasq:/etc/dnsmasq.d
-    networks:
-      - proxy
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.pihole.rule=Host(`pihole.{{ internal_subdomain }}.{{ domain }}`)"
-      - "traefik.http.routers.pihole.entrypoints=websecure"
-      - "traefik.http.routers.pihole.tls.certresolver=letsencrypt"
-      - "traefik.http.services.pihole.loadbalancer.server.port=80"
-      - "traefik.docker.network=proxy"
-
-networks:
-  proxy:
-    external: true
-
-volumes:
-  pihole_data:
-    name: pihole_data
-  pihole_dnsmasq:
-    name: pihole_dnsmasq
+      - "{{ homelab_base_dir }}/services/pihole/etc-pihole:/etc/pihole"
+    cap_add:
+      - NET_ADMIN   # required for DHCP
+      - SYS_TIME
+      - SYS_NICE
+    restart: unless-stopped

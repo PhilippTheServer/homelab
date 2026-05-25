@@ -6,6 +6,38 @@ For the full network diagram and architecture decisions, see [INFRASTRUCTURE.md]
 
 ---
 
+# Setup
+
+**Requirements**
+- ansible
+- ansible-galaxy (for community playbooks)
+- Namecheap (domain)
+- Cloudflare [API Token] (free account for tunel)
+- ssh key to target system
+
+
+To generate all passwords use:
+
+```sh
+# Strong random password (use for any "CHOOSE_A_PASSWORD" above)
+openssl rand -base64 32
+
+# Vaultwarden admin token
+openssl rand -hex 32
+
+# Harbor secret key (exactly 16 chars)
+openssl rand -hex 8
+
+# Traefik dashboard auth (run locally, needs apache2-utils)
+htpasswd -nB philipp
+```
+
+Create a Cloudflare API Token. Paste into the vault file.
+
+
+
+---
+
 ## Access Model
 
 **There is no public IP and no open ports on the Fritz Box.** Services are accessible in two ways only:
@@ -25,22 +57,22 @@ Services are listed in setup priority order — the order in which they should b
 
 | Priority | Service | Role | URL |
 |---|---|---|---|
-| 1 | **Keycloak** | SSO / OIDC identity provider — all services authenticate here | `auth.home.<domain>` |
-| 2 | **Traefik** | Reverse proxy, wildcard SSL (Let's Encrypt via Cloudflare DNS) | `traefik.home.<domain>` |
-| 2 | **Headscale** | Self-hosted Tailscale VPN control plane | `vpn.<domain>` (public, via Cloudflare Tunnel) |
-| 3 | **HashiCorp Vault** | Secrets management, dynamic credentials for automation | `vault.home.<domain>` |
-| 3 | **Vaultwarden** | Self-hosted Bitwarden-compatible password manager | `bw.home.<domain>` |
-| 4 | **Pi-hole** | DNS + DHCP, ad/tracker blocking, internal DNS resolution | `pihole.home.<domain>` |
-| 4 | **GitLab CE** | Git hosting + CI/CD pipelines | `gitlab.home.<domain>` |
-| 4 | **Harbor** | Docker image registry | `registry.home.<domain>` |
+| 1 | **Keycloak** | SSO / OIDC identity provider — all services authenticate here | `auth.home.philippthesurfer.com` |
+| 2 | **Traefik** | Reverse proxy, wildcard SSL (Let's Encrypt via Cloudflare DNS) | `traefik.home.philippthesurfer.com` |
+| 2 | **Headscale** | Self-hosted Tailscale VPN control plane | `vpn.philippthesurfer.com` (public, via Cloudflare Tunnel) |
+| 3 | **HashiCorp Vault** | Secrets management, dynamic credentials for automation | `vault.home.philippthesurfer.com` |
+| 3 | **Vaultwarden** | Self-hosted Bitwarden-compatible password manager | `bw.home.philippthesurfer.com` |
+| 4 | **Pi-hole** | DNS + DHCP, ad/tracker blocking, internal DNS resolution | `pihole.home.philippthesurfer.com` |
+| 4 | **GitLab CE** | Git hosting + CI/CD pipelines | `gitlab.home.philippthesurfer.com` |
+| 4 | **Harbor** | Docker image registry | `registry.home.philippthesurfer.com` |
 
-All services sit behind Traefik with a wildcard Let's Encrypt cert (`*.home.<domain>`). Each service stack is self-contained with its own Postgres (and Redis where needed) — stacks can be rebuilt or replaced independently.
+All services sit behind Traefik with a wildcard Let's Encrypt cert (`*.home.philippthesurfer.com`). Each service stack is self-contained with its own Postgres (and Redis where needed) — stacks can be rebuilt or replaced independently.
 
 ---
 
 ## DNS Setup (Cloudflare Required)
 
-Cloudflare is required — not just recommended — for two reasons:
+Cloudflare is required — for two reasons:
 
 1. **Cloudflare Tunnel** is how Headscale is reachable from the internet without a public IP
 2. **Cloudflare DNS challenge** is how Traefik gets Let's Encrypt certs without exposing any port
@@ -110,38 +142,12 @@ On **Cloudflare** (before running Ansible):
 
 ### 1. Configure inventory
 
-Edit [ansible/inventory/hosts.yml](ansible/inventory/hosts.yml):
-
-```yaml
-all:
-  hosts:
-    minipc:
-      ansible_host: 192.168.178.x   # Mini PC LAN IP
-      ansible_user: deploy
-      ansible_ssh_private_key_file: ~/.ssh/id_ed25519
-```
+Edit [ansible/inventory/hosts.yml](ansible/inventory/hosts.yml) to set target device.
 
 ### 2. Set non-secret variables
 
-Edit [ansible/group_vars/all/vars.yml](ansible/group_vars/all/vars.yml):
+Edit [ansible/group_vars/all/vars.yml](ansible/group_vars/all/vars.yml) to change versions or other chore variables.
 
-```yaml
-domain: "yourdomain.com"
-internal_subdomain: "home"          # services at *.home.yourdomain.com
-minipc_ip: "192.168.178.x"
-traefik_acme_email: "you@email.com"
-letsencrypt_staging: false          # set true during initial setup to avoid rate limits
-
-# Pin versions — update deliberately
-traefik_version: "v3.x"
-keycloak_version: "25.x.x"
-headscale_version: "0.x.x"
-vault_version: "1.x.x"
-vaultwarden_version: "1.x.x"
-gitlab_version: "17.x.x-ce.0"
-harbor_version: "v2.x.x"
-pihole_version: "latest"
-```
 
 ### 3. Create the Ansible Vault
 
@@ -151,176 +157,62 @@ ansible-vault create ansible/group_vars/all/vault.yml
 
 Populate with (use `ansible-vault edit` to update later):
 
+<details>
+<summary>vault.yml template</summary>
+
 ```yaml
-# Cloudflare (Traefik DNS challenge + Tunnel)
-vault_cloudflare_api_token: "your_cloudflare_api_token"
-vault_cloudflare_tunnel_token: "your_cloudflare_tunnel_token"  # for cloudflared container
+# ── Cloudflare ──────────────────────────────────────────────────────────────
+# From: Cloudflare dashboard → My Profile → API Tokens → Create Token
+# Permission: Zone:DNS:Edit for philippthesurfer.com
+vault_cloudflare_api_token: "YOUR_CLOUDFLARE_API_TOKEN"
 
-# Traefik dashboard
-vault_traefik_dashboard_auth: "admin:$2y$..."  # generate: htpasswd -nB admin
+# From: Cloudflare Zero Trust → Networks → Tunnels → your tunnel → Configure → token
+vault_cloudflare_tunnel_token: "YOUR_TUNNEL_TOKEN"
 
-# Keycloak admin
+# ── Traefik dashboard ────────────────────────────────────────────────────────
+# Generate with: htpasswd -nB philipp   (install: apt install apache2-utils)
+vault_traefik_dashboard_auth: "philipp:$2y$..."
+
+# ── Pi-hole ──────────────────────────────────────────────────────────────────
+# Your existing password from the current compose file
+vault_pihole_webpassword: "CHOOSE_A_PASSWORD"
+
+# ── Keycloak ─────────────────────────────────────────────────────────────────
 vault_keycloak_admin_user: "admin"
-vault_keycloak_admin_password: "changeme"
-vault_keycloak_db_password: "changeme"
+vault_keycloak_admin_password: "CHOOSE_A_PASSWORD"
+vault_keycloak_db_password: "CHOOSE_A_PASSWORD"
 
-# HashiCorp Vault
-vault_hcvault_db_password: "changeme"
-# Note: Vault unseal keys and root token are generated on first init — store in Bitwarden
+# ── HashiCorp Vault ───────────────────────────────────────────────────────────
+# No DB password needed — uses integrated Raft storage
+# Unseal keys are generated on first deploy via: docker exec -it vault vault operator init
 
-# Vaultwarden
-vault_vaultwarden_db_password: "changeme"
-vault_vaultwarden_admin_token: "changeme"  # generate: openssl rand -hex 32
+# ── Vaultwarden ──────────────────────────────────────────────────────────────
+vault_vaultwarden_db_password: "CHOOSE_A_PASSWORD"
+# Generate with: openssl rand -hex 32
+vault_vaultwarden_admin_token: "GENERATE_WITH_OPENSSL"
 
-# GitLab
-vault_gitlab_root_password: "changeme"
-vault_gitlab_db_password: "changeme"
+# ── Headscale ────────────────────────────────────────────────────────────────
+vault_headscale_db_password: "CHOOSE_A_PASSWORD"
 
-# Harbor
-vault_harbor_admin_password: "changeme"
-vault_harbor_db_password: "changeme"
-vault_harbor_secret_key: "changeme-16chars"  # exactly 16 characters
+# ── GitLab ───────────────────────────────────────────────────────────────────
+vault_gitlab_root_password: "CHOOSE_A_PASSWORD"
 
-# Headscale
-vault_headscale_db_password: "changeme"
+# ── Harbor ───────────────────────────────────────────────────────────────────
+vault_harbor_admin_password: "CHOOSE_A_PASSWORD"
+vault_harbor_db_password: "CHOOSE_A_PASSWORD"
+# Generate with: openssl rand -hex 8   (must be exactly 16 chars)
+vault_harbor_secret_key: "EXACTLY_16_CHARS_"
 
-# Keycloak OIDC client secrets (fill in after Keycloak is running)
+# ── OIDC client secrets — fill in AFTER Keycloak is running ──────────────────
 vault_gitlab_oidc_secret: ""
 vault_harbor_oidc_secret: ""
 vault_headscale_oidc_secret: ""
 vault_vaultwarden_oidc_secret: ""
 ```
 
-Store your vault password in a password manager. Never commit it.
+</details>
 
----
-
-## Bootstrap
-
-### Deployment order
-
-Infrastructure must be bootstrapped in dependency order. Priority reflects architectural importance; deployment order reflects technical dependencies.
-
-```
-[infrastructure]  common     → Docker, UFW, deploy user (prerequisite for everything)
-[infrastructure]  traefik    → SSL and routing (prerequisite for all HTTPS services)
-
-[priority 1]      keycloak   → SSO — must exist before any service is wired to it
-
-[priority 2]      headscale  → VPN — wire Keycloak OIDC, then Cloudflare Tunnel goes live
-
-[priority 3]      vault      → HashiCorp Vault — secrets automation
-[priority 3]      vaultwarden → Password manager
-
-[priority 4]      pihole     → Internal DNS (or migrate existing Pi-hole to IaC)
-[priority 4]      gitlab     → Push this repo here; CI takes over re-deploys
-[priority 4]      harbor     → Registry
-```
-
-### Commands
-
-```bash
-# 0. Verify connectivity
-ansible minipc -m ping -i ansible/inventory/hosts.yml --ask-vault-pass
-
-# 1. Provision host
-ansible-playbook ansible/site.yml -i ansible/inventory/hosts.yml \
-  --tags common --ask-vault-pass
-
-# 2. Traefik (SSL prerequisite)
-ansible-playbook ansible/site.yml -i ansible/inventory/hosts.yml \
-  --tags traefik --ask-vault-pass
-
-# 3. Keycloak
-ansible-playbook ansible/site.yml -i ansible/inventory/hosts.yml \
-  --tags keycloak --ask-vault-pass
-
-# 4. Headscale (wire Keycloak OIDC first — see post-bootstrap below)
-ansible-playbook ansible/site.yml -i ansible/inventory/hosts.yml \
-  --tags headscale --ask-vault-pass
-
-# 5. HashiCorp Vault
-ansible-playbook ansible/site.yml -i ansible/inventory/hosts.yml \
-  --tags hcvault --ask-vault-pass
-
-# 6. Vaultwarden
-ansible-playbook ansible/site.yml -i ansible/inventory/hosts.yml \
-  --tags vaultwarden --ask-vault-pass
-
-# 7. Pi-hole (migrate existing or fresh deploy)
-ansible-playbook ansible/site.yml -i ansible/inventory/hosts.yml \
-  --tags pihole --ask-vault-pass
-
-# 8. GitLab + Harbor
-ansible-playbook ansible/site.yml -i ansible/inventory/hosts.yml \
-  --tags gitlab,harbor --ask-vault-pass
-```
-
-### Post-bootstrap: wire SSO
-
-After Keycloak is running, create OIDC clients for each service before deploying them:
-
-1. Log into `auth.home.<domain>` → create realm `homelab`
-2. Create OIDC clients: `headscale`, `gitlab`, `harbor`, `vaultwarden`
-3. Add each client secret to Vault:
-   ```bash
-   ansible-vault edit ansible/group_vars/all/vault.yml
-   # fill in vault_*_oidc_secret fields
-   ```
-4. Re-run the affected roles to apply SSO config
-
-### Post-bootstrap: initialize HashiCorp Vault
-
-HashiCorp Vault requires a one-time init after first deploy:
-
-```bash
-ssh deploy@192.168.178.x
-docker exec -it vault vault operator init
-
-# Save the 5 unseal keys and root token in Vaultwarden immediately
-# Vault needs 3 of 5 keys to unseal after every restart
-docker exec -it vault vault operator unseal  # run 3 times with different keys
-```
-
-Consider configuring auto-unseal later (e.g. using a cloud KMS or a dedicated key) to avoid manual unsealing after reboots.
-
-### Post-bootstrap: migrate this repo to GitLab
-
-```bash
-git remote add homelab https://gitlab.home.<domain>/<user>/homelab.git
-git push homelab main
-```
-
-From this point, GitLab CI handles re-deploys on push.
-
----
-
-## Day-to-Day
-
-### Update a service version
-
-1. Edit the version in `ansible/group_vars/all/vars.yml`
-2. Push to GitLab → CI re-deploys the affected stack
-3. Or manually: `ansible-playbook ansible/site.yml --tags <service> --ask-vault-pass`
-
-### Restart a stack
-
-```bash
-ssh deploy@192.168.178.x
-docker compose -f /opt/homelab/services/<service>/docker-compose.yml restart
-```
-
-### View logs
-
-```bash
-ssh deploy@192.168.178.x
-docker compose -f /opt/homelab/services/<service>/docker-compose.yml logs -f
-```
-
-### Rotate a secret
-
-1. `ansible-vault edit ansible/group_vars/all/vault.yml` — update the value
-2. Re-run the role: `ansible-playbook ansible/site.yml --tags <service> --ask-vault-pass`
+Store your vault password in a password manager.
 
 ---
 
@@ -334,11 +226,12 @@ docker compose -f /opt/homelab/services/<service>/docker-compose.yml logs -f
 3. Add secrets to `vault.yml`, variables to `vars.yml`
 4. Add role to `ansible/site.yml` with matching tag
 5. Create OIDC client in Keycloak if the service supports SSO
-6. Add Pi-hole DNS record: `<name>.home.<domain>` → Mini PC LAN IP
+6. Add Pi-hole DNS record: `<name>.home.philippthesurfer.com` → Mini PC LAN IP
 
 ---
 
-## Repo Layout
+<details>
+<summary>Repo Layout</summary>
 
 ```
 homelab/
@@ -372,14 +265,16 @@ homelab/
 └── INFRASTRUCTURE.md              # network diagram + architecture decisions
 ```
 
+</details>
+
 ---
 
 ## Troubleshooting
 
-**Can't reach a service at `*.home.<domain>`**
+**Can't reach a service at `*.home.philippthesurfer.com`**
 - Confirm your device is on the LAN or connected via Headscale VPN
 - Check Pi-hole has a DNS record for the hostname pointing to Mini PC LAN IP
-- Check Traefik dashboard (`traefik.home.<domain>`) — verify the router is registered
+- Check Traefik dashboard (`traefik.home.philippthesurfer.com`) — verify the router is registered
 
 **Let's Encrypt cert not issuing**
 - Check Traefik logs: `docker compose -f /opt/homelab/services/traefik/docker-compose.yml logs`
