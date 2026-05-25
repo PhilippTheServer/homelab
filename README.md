@@ -10,10 +10,10 @@ For the full network diagram and architecture decisions, see [INFRASTRUCTURE.md]
 
 **There is no public IP and no open ports on the Fritz Box.** Services are accessible in two ways only:
 
-- **On the local network** — `*.home.<domain>.com` resolves via Pi-hole to the Mini PC's LAN IP
+- **On the local network** — `*.home.philippthesurfer.com` resolves via Pi-hole to the Mini PC's LAN IP
 - **Remotely via VPN** — Headscale (self-hosted Tailscale) provides a private mesh network
 
-The only exception is Headscale's own control plane, which must be reachable from the internet for VPN device registration. This is handled via a **Cloudflare Tunnel** — a single outbound `cloudflared` container creates a tunnel to Cloudflare's edge, routing `vpn.<domain>.com` → Headscale. No ports are opened. Nothing else is tunneled.
+The only exception is Headscale's own control plane, which must be reachable from the internet for VPN device registration. This is handled via a **Cloudflare Tunnel** — a single outbound `cloudflared` container creates a tunnel to Cloudflare's edge, routing `vpn.philippthesurfer.com` → Headscale. No ports are opened. Nothing else is tunneled.
 
 **Keycloak, Bitwarden, and all other services are never reachable from the public internet.**
 
@@ -51,10 +51,10 @@ Cloudflare is required — not just recommended — for two reasons:
 3. Namecheap → Domain settings → change nameservers to Cloudflare's nameservers
 4. In Cloudflare: create an API token with `Zone:DNS:Edit` permission (used by Traefik)
 5. In Cloudflare: create a Tunnel for Headscale (Cloudflare Zero Trust → Tunnels → Create tunnel)
-   - Route: `vpn.<domain>.com` → `http://headscale:8080` (internal container hostname)
+   - Route: `vpn.philippthesurfer.com` → `http://headscale:8080` (internal container hostname)
    - Copy the tunnel token — goes into Ansible Vault
 
-Internal service DNS (`*.home.<domain>.com`) is handled by Pi-hole pointing to the Mini PC LAN IP. These records never leave your network.
+Internal service DNS (`*.home.philippthesurfer.com`) is handled by Pi-hole pointing to the Mini PC LAN IP. These records never leave your network.
 
 ---
 
@@ -102,7 +102,7 @@ On **Cloudflare** (before running Ansible):
 1. Domain added to Cloudflare with nameservers updated at Namecheap
 2. API token created: `Zone:DNS:Edit` for your domain
 3. Cloudflare Tunnel created for Headscale — tunnel token copied
-4. DNS record added: `vpn.<domain>.com` → tunnel (Cloudflare sets this automatically when creating the tunnel)
+4. DNS record added: `vpn.philippthesurfer.com` → tunnel (Cloudflare sets this automatically when creating the tunnel)
 
 ---
 
@@ -389,7 +389,7 @@ homelab/
 **Headscale devices can't connect remotely**
 - Check Cloudflare Tunnel status: Cloudflare Zero Trust dashboard → Tunnels
 - Check `cloudflared` container logs in the traefik stack
-- Verify `vpn.<domain>.com` resolves to Cloudflare (not your LAN IP)
+- Verify `vpn.philippthesurfer.com` resolves to Cloudflare (not your LAN IP)
 
 **Keycloak OIDC login failing**
 - Verify the redirect URI in the Keycloak client matches the service URL exactly

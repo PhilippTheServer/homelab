@@ -19,7 +19,7 @@ graph TD
         FB["Router + WiFi AP\nNAT · No open ports"]
     end
 
-    subgraph MiniPC ["Mini PC — 192.168.178.x · Debian 13 · Docker · 16 GB RAM"]
+    subgraph MiniPC ["Mini PC — 192.168.178.20 · Debian 13 · Docker · 16 GB RAM"]
         Traefik["Traefik\nReverse Proxy · SSL\n(Cloudflare DNS challenge)"]
         cloudflared["cloudflared\nOutbound tunnel only\n→ Cloudflare"]
         PH["Pi-hole\nDNS + DHCP\nInternal DNS for *.home.domain"]
@@ -65,11 +65,11 @@ graph TD
 
 | From | How | What's accessible |
 |---|---|---|
-| Local LAN | Direct (192.168.178.0/24) | All `*.home.<domain>` services |
-| Remote (VPN) | Headscale mesh → Traefik | All `*.home.<domain>` services |
-| Public internet | **Nothing** | Only `vpn.<domain>` (Cloudflare Tunnel → Headscale control plane) |
+| Local LAN | Direct (192.168.178.0/24) | All `*.home.philippthesurfer.com` services |
+| Remote (VPN) | Headscale mesh → Traefik | All `*.home.philippthesurfer.com` services |
+| Public internet | **Nothing** | Only `vpn.philippthesurfer.com` (Cloudflare Tunnel → Headscale control plane) |
 
-The Cloudflare Tunnel is outbound-only from the Mini PC. No inbound ports are opened on the Fritz Box. `*.home.<domain>` records resolve to the Mini PC LAN IP via Pi-hole and are unreachable from outside the VPN.
+The Cloudflare Tunnel is outbound-only from the Mini PC. No inbound ports are opened on the Fritz Box. `*.home.philippthesurfer.com` records resolve to the Mini PC LAN IP via Pi-hole and are unreachable from outside the VPN.
 
 ---
 
@@ -80,7 +80,7 @@ Each stack is an independent Docker Compose file with its own database.
 ### Traefik + cloudflared (Priority 2 — infrastructure)
 - **Role:** Reverse proxy for all internal services, wildcard SSL, Cloudflare Tunnel sidecar
 - **SSL:** Let's Encrypt wildcard cert via Cloudflare DNS API (works without public IP)
-- **Tunnel:** `cloudflared` container runs alongside Traefik, routes `vpn.<domain>` → Headscale
+- **Tunnel:** `cloudflared` container runs alongside Traefik, routes `vpn.philippthesurfer.com` → Headscale
 - **Compose:** `services/traefik/docker-compose.yml`
 - **Note:** Must be deployed before any HTTPS service, but after Keycloak is configured
 
@@ -93,7 +93,7 @@ Each stack is an independent Docker Compose file with its own database.
 
 ### Headscale (Priority 2 — remote access)
 - **Role:** Self-hosted Tailscale control plane, VPN mesh for remote access
-- **Public endpoint:** `vpn.<domain>` — routed via Cloudflare Tunnel (not LAN-only)
+- **Public endpoint:** `vpn.philippthesurfer.com` — routed via Cloudflare Tunnel (not LAN-only)
 - **Auth:** OIDC via Keycloak
 - **Database:** Dedicated Postgres container in the same stack
 - **Compose:** `services/headscale/docker-compose.yml`
@@ -112,8 +112,8 @@ Each stack is an independent Docker Compose file with its own database.
 - **Compose:** `services/vaultwarden/docker-compose.yml`
 
 ### Pi-hole (Priority 4)
-- **Role:** Network-wide DNS server + DHCP, ad/tracker blocking, internal DNS for `*.home.<domain>`
-- **Internal DNS:** All `*.home.<domain>` records point to Mini PC LAN IP — no split-DNS hairpin
+- **Role:** Network-wide DNS server + DHCP, ad/tracker blocking, internal DNS for `*.home.philippthesurfer.com`
+- **Internal DNS:** All `*.home.philippthesurfer.com` records point to Mini PC LAN IP — no split-DNS hairpin
 - **Upstream DNS:** Cloudflare `1.1.1.1`
 - **Compose:** `services/pihole/docker-compose.yml`
 
@@ -193,15 +193,15 @@ harbor      → registry
 ### Internal browser request
 ```
 Device (LAN or VPN) → DNS query to Pi-hole
-Pi-hole → resolves *.home.<domain> → Mini PC LAN IP
+Pi-hole → resolves *.home.philippthesurfer.com → Mini PC LAN IP
 Device → Traefik :443 → routes by hostname → service container
 ```
 
 ### Remote access (VPN)
 ```
-Remote device → vpn.<domain> (Cloudflare Tunnel) → cloudflared → Headscale
+Remote device → vpn.philippthesurfer.com (Cloudflare Tunnel) → cloudflared → Headscale
 Headscale → establishes mesh VPN → device acts as if on LAN
-Device → *.home.<domain> → Traefik → service
+Device → *.home.philippthesurfer.com → Traefik → service
 ```
 
 ### CI/CD pipeline
@@ -212,14 +212,14 @@ GitLab CI → ansible-playbook → docker compose pull + up → service updated
 
 ### SSO login
 ```
-User → service → redirect to auth.home.<domain> (Keycloak) → authenticate → token → service
+User → service → redirect to auth.home.philippthesurfer.com (Keycloak) → authenticate → token → service
 ```
 
 ---
 
 ## Open Questions / To Clarify
 
-- Mini PC exact IP address (fill in `192.168.178.x`)
+- Mini PC exact IP address (fill in `192.168.178.20`)
 - Fritz Box DHCP: fully disabled in favour of Pi-hole, or running alongside?
 - HashiCorp Vault auto-unseal strategy (cloud KMS vs. manual) — needed after any reboot
 - GitLab Runner concurrent build limit (default: 1, increase carefully given 16 GB RAM)
