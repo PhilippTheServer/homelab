@@ -1,24 +1,24 @@
 ---
 # ── Network ────────────────────────────────────────────────────────────────────
-domain: "yourdomain.com"              # TODO: your public domain
-internal_subdomain: "home"            # services at *.home.yourdomain.com
-minipc_ip: "192.168.178.x"            # TODO: Mini PC LAN IP
+domain: "philippthesurfer.com "       # TODO: your public domain
+internal_subdomain: "home"            # services at *.home.philippthesurfer.com 
+minipc_ip: "192.168.178.20"            # TODO: Mini PC LAN IP
 
 # ── Ansible / Deploy ───────────────────────────────────────────────────────────
-deploy_user: deploy
+deploy_user: philipp
 homelab_base_dir: /opt/homelab
 
 # ── Let's Encrypt ──────────────────────────────────────────────────────────────
-traefik_acme_email: "you@example.com" # TODO: your email
-letsencrypt_staging: false            # set true during initial setup to avoid rate limits
+traefik_acme_email: "philipp-l20@protonmail.com" # TODO: your email
+letsencrypt_staging: true            # set true during initial setup to avoid rate limits
 
 # ── Service versions (pin these, update deliberately) ──────────────────────────
-traefik_version: "v3.3"
-keycloak_version: "26.2"
-headscale_version: "0.23.0"
-hcvault_version: "1.19"
-vaultwarden_version: "1.32"
-postgres_version: "16-alpine"
-gitlab_version: "17.8.1-ce.0"
-harbor_version: "v2.12.0"
-pihole_version: "2024.07.0"
+traefik_version: "v3.7"
+keycloak_version: "26.6"
+headscale_version: "0.28.0"
+hcvault_version: "2.0"
+vaultwarden_version: "1.36"
+postgres_version: "18-alpine"
+gitlab_version: "19.0.0-ce.0"
+harbor_version: "v2.14.0"
+pihole_version: "2026.05.0"
