@@ -1,16 +1,17 @@
 ---
 # ── Network ────────────────────────────────────────────────────────────────────
-domain: "philippthesurfer.com "       # TODO: your public domain
-internal_subdomain: "home"            # services at *.home.philippthesurfer.com 
-minipc_ip: "192.168.178.20"            # TODO: Mini PC LAN IP
+domain: "philippthesurfer.com"
+internal_subdomain: "home"
+minipc_ip: "192.168.178.20"
 
 # ── Ansible / Deploy ───────────────────────────────────────────────────────────
 deploy_user: philipp
 homelab_base_dir: /opt/homelab
 
 # ── Let's Encrypt ──────────────────────────────────────────────────────────────
-traefik_acme_email: "philipp-l20@protonmail.com" # TODO: your email
-letsencrypt_staging: true            # set true during initial setup to avoid rate limits
+traefik_acme_email: "philipp-l20@protonmail.com"
+letsencrypt_staging: true            
+# set true during initial setup to avoid rate limits
 
 # ── Service versions (pin these, update deliberately) ──────────────────────────
 traefik_version: "v3.7"
