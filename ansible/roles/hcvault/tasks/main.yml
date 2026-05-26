@@ -28,6 +28,10 @@
     mode: '0640'
   notify: restart hcvault
 
+- name: Fix vault data volume ownership (vault runs as uid 100)
+  command: docker run --rm -v vault_data:/vault/data busybox chown -R 100:1000 /vault/data
+  changed_when: false
+
 - name: Ensure hcvault stack is running
   command:
     cmd: docker compose up -d --remove-orphans
