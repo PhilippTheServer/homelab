@@ -1,6 +1,6 @@
 ---
 - name: restart vaultwarden
   command:
-    cmd: docker compose up -d --remove-orphans
+    cmd: docker compose up -d --force-recreate --remove-orphans
     chdir: "{{ homelab_base_dir }}/services/vaultwarden"
   become_user: "{{ deploy_user }}"

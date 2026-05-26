@@ -47,11 +47,14 @@ policy:
 
 dns:
   magic_dns: true
-  base_domain: "{{ domain }}"
+  base_domain: "mesh.{{ domain }}"
   nameservers:
     global:
       - 1.1.1.1
       - 8.8.8.8
+    split:
+      "{{ internal_subdomain }}.{{ domain }}":
+        - {{ minipc_ip }}
 
 oidc:
   only_start_if_oidc_is_available: true

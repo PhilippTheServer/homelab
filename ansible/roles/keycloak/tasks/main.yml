@@ -1,11 +1,22 @@
 ---
-- name: Create keycloak directory
+- name: Create keycloak directories
   file:
-    path: "{{ homelab_base_dir }}/services/keycloak"
+    path: "{{ item }}"
     state: directory
     owner: "{{ deploy_user }}"
     group: "{{ deploy_user }}"
     mode: '0750'
+  loop:
+    - "{{ homelab_base_dir }}/services/keycloak"
+    - "{{ homelab_base_dir }}/services/keycloak/import"
+
+- name: Render realm import JSON
+  template:
+    src: "{{ playbook_dir }}/../services/keycloak/realm-homelab.json.j2"
+    dest: "{{ homelab_base_dir }}/services/keycloak/import/realm-homelab.json"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: '0640'
 
 - name: Render docker-compose.yml
   template:

@@ -10,8 +10,7 @@ homelab_base_dir: /opt/homelab
 
 # ── Let's Encrypt ──────────────────────────────────────────────────────────────
 traefik_acme_email: "philipp-l20@protonmail.com"
-letsencrypt_staging: true            
-# set true during initial setup to avoid rate limits
+letsencrypt_staging: false
 
 # ── Service versions (pin these, update deliberately) ──────────────────────────
 traefik_version: "v3.7"

@@ -48,7 +48,7 @@ services:
       POSTGRES_USER: vaultwarden
       POSTGRES_PASSWORD: "{{ vault_vaultwarden_db_password }}"
     volumes:
-      - vaultwarden_db:/var/lib/postgresql/data
+      - vaultwarden_db:/var/lib/postgresql
     networks:
       - internal
     healthcheck:

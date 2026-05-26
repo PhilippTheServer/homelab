@@ -28,6 +28,14 @@
     mode: '0640'
   notify: restart headscale
 
+- name: Render headplane config.yaml
+  template:
+    src: "{{ playbook_dir }}/../services/headscale/headplane.yaml.j2"
+    dest: "{{ homelab_base_dir }}/services/headscale/headplane.yaml"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: '0640'
+
 - name: Ensure headscale stack is running
   command:
     cmd: docker compose up -d --remove-orphans

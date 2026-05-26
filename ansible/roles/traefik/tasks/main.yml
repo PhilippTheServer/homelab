@@ -16,6 +16,20 @@
     mode: '0640'
   notify: restart traefik
 
+- name: Render cloudflared config
+  template:
+    src: "{{ playbook_dir }}/../services/traefik/cloudflared-config.yaml.j2"
+    dest: "{{ homelab_base_dir }}/services/traefik/cloudflared-config.yaml"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: '0644'
+  notify: restart traefik
+
+- name: Create proxy Docker network
+  community.docker.docker_network:
+    name: proxy
+    state: present
+
 - name: Ensure traefik stack is running
   command:
     cmd: docker compose up -d --remove-orphans

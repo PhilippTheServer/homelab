@@ -32,6 +32,9 @@ services:
       - --accesslog=true
     environment:
       CF_DNS_API_TOKEN: "{{ vault_cloudflare_api_token }}"
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     ports:
       - "80:80"
       - "443:443"
@@ -50,15 +53,18 @@ services:
       - "traefik.http.routers.traefik-dashboard.tls.domains[0].sans=*.{{ internal_subdomain }}.{{ domain }}"
       - "traefik.http.routers.traefik-dashboard.service=api@internal"
       - "traefik.http.routers.traefik-dashboard.middlewares=traefik-auth@docker"
-      - "traefik.http.middlewares.traefik-auth.basicauth.users={{ vault_traefik_dashboard_auth }}"
+      - "traefik.http.middlewares.traefik-auth.basicauth.users={{ vault_traefik_dashboard_auth | replace('$', '$$') }}"
+      - "traefik.http.services.traefik-dashboard.loadbalancer.server.port=8080"
 
   cloudflared:
     image: cloudflare/cloudflared:latest
     container_name: cloudflared
     restart: unless-stopped
-    command: tunnel --no-autoupdate run
+    command: tunnel --no-autoupdate --config /etc/cloudflared/config.yaml run
     environment:
       TUNNEL_TOKEN: "{{ vault_cloudflare_tunnel_token }}"
+    volumes:
+      - {{ homelab_base_dir }}/services/traefik/cloudflared-config.yaml:/etc/cloudflared/config.yaml:ro
     networks:
       - proxy
 

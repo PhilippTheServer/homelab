@@ -5,7 +5,7 @@ services:
     image: quay.io/keycloak/keycloak:{{ keycloak_version }}
     container_name: keycloak
     restart: unless-stopped
-    command: start
+    command: start --import-realm
     environment:
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://keycloak-db:5432/keycloak
@@ -18,6 +18,8 @@ services:
       KC_HEALTH_ENABLED: "true"
       KEYCLOAK_ADMIN: "{{ vault_keycloak_admin_user }}"
       KEYCLOAK_ADMIN_PASSWORD: "{{ vault_keycloak_admin_password }}"
+    volumes:
+      - {{ homelab_base_dir }}/services/keycloak/import:/opt/keycloak/data/import:ro
     depends_on:
       keycloak-db:
         condition: service_healthy
@@ -41,7 +43,7 @@ services:
       POSTGRES_USER: keycloak
       POSTGRES_PASSWORD: "{{ vault_keycloak_db_password }}"
     volumes:
-      - keycloak_db:/var/lib/postgresql/data
+      - keycloak_db:/var/lib/postgresql
     networks:
       - internal
     healthcheck:
