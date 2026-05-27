@@ -261,7 +261,9 @@ homelab/
 │   ├── gitlab/
 │   └── harbor/
 ├── README.md
-└── INFRASTRUCTURE.md              # network diagram + architecture decisions
+├── INFRASTRUCTURE.md              # network diagram + architecture decisions
+├── HASHICORPVAULT.md              # Vault CLI setup, SSH certs, secret management, Ansible integration
+└── BOOTSTRAP.md                   # step-by-step first-deploy guide
 ```
 
 </details>

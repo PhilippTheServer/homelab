@@ -137,7 +137,7 @@ Each stack is an independent Docker Compose file with its own database.
 | Layer | Tool | Purpose |
 |---|---|---|
 | Host provisioning | Ansible | Docker, UFW, system users, directories |
-| Secrets | Ansible Vault | All credentials encrypted in repo |
+| Secrets | HashiCorp Vault | All credentials in Vault KV v2 (`secret/ansible`); fetched at runtime via `community.hashi_vault` — nothing sensitive in the repo |
 | Service deployment | Docker Compose (Jinja2 templates) | Ansible renders and deploys each stack |
 | CI/CD | GitLab CI | Re-deploys stacks after bootstrap |
 
