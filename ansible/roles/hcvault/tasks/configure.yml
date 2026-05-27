@@ -74,6 +74,9 @@
     path "secret/metadata/ci-cd/*" {
       capabilities = ["list"]
     }
+    path "secret/data/ansible" {
+      capabilities = ["read"]
+    }
     path "ssh/sign/ci-cd" {
       capabilities = ["create", "update"]
     }

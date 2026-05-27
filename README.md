@@ -96,10 +96,11 @@ Internal service DNS (`*.home.philippthesurfer.com`) is handled by Pi-hole point
 Ansible (local machine)
   └── renders Jinja2 templates → Docker Compose files on the Mini PC
   └── runs docker compose up -d per stack
-  └── all secrets come from Ansible Vault (encrypted in this repo)
+  └── all secrets fetched at runtime from HashiCorp Vault (KV at secret/data/ansible)
 
 After bootstrap:
   GitLab CI → re-deploys stacks on git push (Ansible only needed for host-level changes)
+  CI/CD authenticates to Vault via AppRole → fetches secrets → runs playbook
 ```
 
 ---
@@ -149,70 +150,68 @@ Edit [ansible/inventory/hosts.yml](ansible/inventory/hosts.yml) to set target de
 Edit [ansible/group_vars/all/vars.yml](ansible/group_vars/all/vars.yml) to change versions or other chore variables.
 
 
-### 3. Create the Ansible Vault
+### 3. Populate secrets in HashiCorp Vault
+
+All secrets live at `secret/data/ansible` in HashiCorp Vault. Ansible fetches them at runtime — nothing sensitive is stored in this repo.
+
+First, install the required Ansible collection:
 
 ```bash
-ansible-vault create ansible/group_vars/all/vault.yml
+ansible-galaxy collection install -r ansible/requirements.yml
 ```
 
-Populate with (use `ansible-vault edit` to update later):
+Then store all secrets (run from your Mac after `vault login -method=oidc`):
+
+```bash
+vault kv put secret/ansible \
+  cloudflare_api_token="..." \
+  cloudflare_tunnel_token="..." \
+  traefik_dashboard_auth="..." \
+  pihole_webpassword="..." \
+  keycloak_admin_user="admin" \
+  keycloak_admin_password="..." \
+  keycloak_db_password="..." \
+  hcvault_root_token="..." \
+  hcvault_oidc_secret="..." \
+  vaultwarden_db_password="..." \
+  vaultwarden_admin_token="..." \
+  vaultwarden_oidc_secret="..." \
+  headscale_db_password="..." \
+  headscale_oidc_secret="..." \
+  headplane_api_key="..." \
+  headplane_cookie_secret="..." \
+  gitlab_root_password="..." \
+  gitlab_oidc_secret="..." \
+  harbor_admin_password="..." \
+  harbor_db_password="..." \
+  harbor_oidc_secret="..."
+```
 
 <details>
-<summary>vault.yml template</summary>
+<summary>Password generation reference</summary>
 
-```yaml
-# ── Cloudflare ──────────────────────────────────────────────────────────────
-# From: Cloudflare dashboard → My Profile → API Tokens → Create Token
+```bash
+# Strong random password (use for any "..." above)
+openssl rand -base64 32
+
+# Vaultwarden admin token
+openssl rand -hex 32
+
+# Harbor secret key (exactly 16 chars)
+openssl rand -hex 8
+
+# Traefik dashboard auth (needs apache2-utils)
+htpasswd -nB philipp
+
+# Cloudflare API Token: dashboard → My Profile → API Tokens → Create Token
 # Permission: Zone:DNS:Edit for philippthesurfer.com
-vault_cloudflare_api_token: "YOUR_CLOUDFLARE_API_TOKEN"
 
-# From: Cloudflare Zero Trust → Networks → Tunnels → your tunnel → Configure → token
-vault_cloudflare_tunnel_token: "YOUR_TUNNEL_TOKEN"
+# Cloudflare Tunnel token: Zero Trust → Networks → Tunnels → your tunnel → Configure
 
-# ── Traefik dashboard ────────────────────────────────────────────────────────
-# Generate with: htpasswd -nB philipp   (install: apt install apache2-utils)
-vault_traefik_dashboard_auth: "philipp:$2y$..."
-
-# ── Pi-hole ──────────────────────────────────────────────────────────────────
-# Your existing password from the current compose file
-vault_pihole_webpassword: "CHOOSE_A_PASSWORD"
-
-# ── Keycloak ─────────────────────────────────────────────────────────────────
-vault_keycloak_admin_user: "admin"
-vault_keycloak_admin_password: "CHOOSE_A_PASSWORD"
-vault_keycloak_db_password: "CHOOSE_A_PASSWORD"
-
-# ── HashiCorp Vault ───────────────────────────────────────────────────────────
-# No DB password needed — uses integrated Raft storage
-# Unseal keys are generated on first deploy via: docker exec -it vault vault operator init
-
-# ── Vaultwarden ──────────────────────────────────────────────────────────────
-vault_vaultwarden_db_password: "CHOOSE_A_PASSWORD"
-# Generate with: openssl rand -hex 32
-vault_vaultwarden_admin_token: "GENERATE_WITH_OPENSSL"
-
-# ── Headscale ────────────────────────────────────────────────────────────────
-vault_headscale_db_password: "CHOOSE_A_PASSWORD"
-
-# ── GitLab ───────────────────────────────────────────────────────────────────
-vault_gitlab_root_password: "CHOOSE_A_PASSWORD"
-
-# ── Harbor ───────────────────────────────────────────────────────────────────
-vault_harbor_admin_password: "CHOOSE_A_PASSWORD"
-vault_harbor_db_password: "CHOOSE_A_PASSWORD"
-# Generate with: openssl rand -hex 8   (must be exactly 16 chars)
-vault_harbor_secret_key: "EXACTLY_16_CHARS_"
-
-# ── OIDC client secrets — fill in AFTER Keycloak is running ──────────────────
-vault_gitlab_oidc_secret: ""
-vault_harbor_oidc_secret: ""
-vault_headscale_oidc_secret: ""
-vault_vaultwarden_oidc_secret: ""
+# OIDC secrets: filled in after Keycloak is running — copy from Keycloak client credentials
 ```
 
 </details>
-
-Store your vault password in a password manager.
 
 ---
 
@@ -240,7 +239,7 @@ homelab/
 │   │   └── hosts.yml              # Mini PC connection details
 │   ├── group_vars/all/
 │   │   ├── vars.yml               # non-secret config (domain, versions, IPs)
-│   │   └── vault.yml              # ansible-vault encrypted secrets
+│   │   └── vault.yml              # hashi_vault lookups — secrets live in HCP Vault
 │   ├── roles/
 │   │   ├── common/                # Docker, UFW, deploy user
 │   │   ├── traefik/               # reverse proxy + SSL + cloudflared tunnel
@@ -298,9 +297,47 @@ homelab/
   ```
 - Long-term: configure auto-unseal with a cloud KMS or dedicated unsealing key
 
-To use the hashi corp vault in the cli with signed key for ssh run:
-```sh
+---
+
+## SSH Access via HashiCorp Vault
+
+SSH uses Vault as a certificate authority — no static keys on servers, full audit trail.
+
+**One-time setup on your Mac:**
+
+Add to `~/.ssh/config`:
+
+```
+Host *.home.philippthesurfer.com
+    User philipp
+    IdentityFile ~/.ssh/vault
+    CertificateFile ~/.ssh/vault-signed.pub
+```
+
+**Each session (cert valid for 8h):**
+
+```bash
+# 1. Login to Vault via Keycloak
+vault login -method=oidc
+
+# 2. Sign your SSH key
 SIGNED=$(vault write -field=signed_key ssh/sign/user public_key="$(cat ~/.ssh/vault.pub)")
-  echo "$SIGNED" > ~/.ssh/vault-signed.pub
-  ssh-keygen -L -f ~/.ssh/vault-signed.pub
+echo "$SIGNED" > ~/.ssh/vault-signed.pub
+
+# 3. SSH in
+ssh minipc.home.philippthesurfer.com
+```
+
+**CI/CD authentication (AppRole):**
+
+```bash
+# Get credentials once and store in CI/CD secret variables:
+vault read -field=role_id auth/approle/role/ci-cd/role-id
+vault write -field=secret_id -f auth/approle/role/ci-cd/secret-id
+
+# In the pipeline, before running ansible:
+export VAULT_TOKEN=$(vault write -field=token auth/approle/login \
+  role_id=$VAULT_ROLE_ID \
+  secret_id=$VAULT_SECRET_ID)
+ansible-playbook ansible/site.yml
 ```
