@@ -8,7 +8,7 @@ export OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES  # add to ~/.zshrc to make perman
 
 # Install hvac into Ansible's Python — required for community.hashi_vault lookups
 # Pin to 1.x: hvac 2.x changed response types, breaking community.hashi_vault 7.x lookups
-/opt/homebrew/Cellar/ansible/*/libexec/bin/python -m pip install "hvac==1.2.1"
+/opt/homebrew/Cellar/ansible/*/libexec/bin/python -m pip install "hvac"
 
 # Install Ansible collections
 ansible-galaxy collection install -r ansible/requirements.yml
