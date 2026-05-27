@@ -58,7 +58,7 @@ dns:
 
 oidc:
   only_start_if_oidc_is_available: true
-  issuer: "https://auth.{{ internal_subdomain }}.{{ domain }}/realms/homelab"
+  issuer: "https://auth.{{ domain }}/realms/homelab"
   client_id: headscale
   client_secret: "{{ vault_headscale_oidc_secret }}"
   expiry: 24h

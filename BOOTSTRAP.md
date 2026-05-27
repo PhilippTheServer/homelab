@@ -1,5 +1,19 @@
 ## Bootstrap
 
+### Prerequisites (control machine)
+
+```bash
+# macOS: prevent "A worker was found in a dead state" fork-safety crash
+export OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES  # add to ~/.zshrc to make permanent
+
+# Install hvac into Ansible's Python — required for community.hashi_vault lookups
+# Pin to 1.x: hvac 2.x changed response types, breaking community.hashi_vault 7.x lookups
+/opt/homebrew/Cellar/ansible/*/libexec/bin/python -m pip install "hvac==1.2.1"
+
+# Install Ansible collections
+ansible-galaxy collection install -r ansible/requirements.yml
+```
+
 ### Deployment order
 
 Infrastructure must be bootstrapped in dependency order. Priority reflects architectural importance; deployment order reflects technical dependencies.
@@ -66,7 +80,7 @@ ansible-playbook ansible/site.yml -i ansible/inventory/hosts.yml \
 
 After Keycloak is running, create OIDC clients for each service before deploying them:
 
-1. Log into `auth.home.philippthesurfer.com` → create realm `homelab`
+1. Log into `auth.philippthesurfer.com` → create realm `homelab`
 2. Create OIDC clients: `headscale`, `gitlab`, `harbor`, `vaultwarden`
 3. Add each client secret to Vault:
    ```bash

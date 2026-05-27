@@ -11,7 +11,7 @@ services:
       KC_DB_URL: jdbc:postgresql://keycloak-db:5432/keycloak
       KC_DB_USERNAME: keycloak
       KC_DB_PASSWORD: "{{ vault_keycloak_db_password }}"
-      KC_HOSTNAME: "auth.{{ internal_subdomain }}.{{ domain }}"
+      KC_HOSTNAME: "auth.{{ domain }}"
       KC_HOSTNAME_STRICT: "false"
       KC_HTTP_ENABLED: "true"
       KC_PROXY_HEADERS: xforwarded
@@ -28,7 +28,7 @@ services:
       - internal
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.keycloak.rule=Host(`auth.{{ internal_subdomain }}.{{ domain }}`)"
+      - "traefik.http.routers.keycloak.rule=Host(`auth.{{ domain }}`)"
       - "traefik.http.routers.keycloak.entrypoints=websecure"
       - "traefik.http.routers.keycloak.tls.certresolver=letsencrypt"
       - "traefik.http.services.keycloak.loadbalancer.server.port=8080"

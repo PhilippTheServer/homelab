@@ -16,6 +16,22 @@
     mode: '0640'
   notify: restart pihole
 
+- name: Ensure pihole custom DNS directory exists
+  file:
+    path: "{{ homelab_base_dir }}/services/pihole/etc-pihole"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: '0750'
+
+- name: Add auth.{{ domain }} to Pi-hole custom DNS
+  lineinfile:
+    path: "{{ homelab_base_dir }}/services/pihole/etc-pihole/custom.list"
+    line: "{{ minipc_ip }} auth.{{ domain }}"
+    create: true
+    state: present
+  notify: restart pihole
+
 - name: Ensure pihole stack is running
   command:
     cmd: docker compose up -d --remove-orphans
