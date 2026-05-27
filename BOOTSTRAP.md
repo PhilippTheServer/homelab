@@ -76,6 +76,16 @@ ansible-playbook ansible/site.yml -i ansible/inventory/hosts.yml \
 
 </details>
 
+### Post-bootstrap: Cloudflare zone settings (one-time, dashboard only)
+
+These cannot be managed via IaC — configure them once in the Cloudflare dashboard:
+
+| Setting | Path | Value |
+|---|---|---|
+| **WebSockets** | philippthesurfer.com → Network → WebSockets | **On** |
+
+WebSockets are required for Headscale's TS2021/Noise protocol. Without this, Tailscale clients from external networks cannot complete the coordination handshake.
+
 ### Post-bootstrap: wire SSO
 
 After Keycloak is running, create OIDC clients for each service before deploying them:

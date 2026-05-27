@@ -19,6 +19,7 @@ services:
       - --entrypoints.web.http.redirections.entrypoint.to=websecure
       - --entrypoints.web.http.redirections.entrypoint.scheme=https
       - --entrypoints.websecure.address=:443
+      - --entrypoints.websecure.http2.enabled=false
       # Let's Encrypt via Cloudflare DNS challenge
       - --certificatesresolvers.letsencrypt.acme.email={{ traefik_acme_email }}
       - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
