@@ -15,6 +15,9 @@ services:
       - {{ homelab_base_dir }}/services/hcvault/config:/vault/config:ro
       - vault_data:/vault/data
       - vault_logs:/vault/logs
+    dns:
+      - {{ minipc_ip }}
+      - 1.1.1.1
     networks:
       - proxy
     labels:

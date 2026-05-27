@@ -297,3 +297,10 @@ homelab/
   docker exec -it vault vault operator unseal
   ```
 - Long-term: configure auto-unseal with a cloud KMS or dedicated unsealing key
+
+To use the hashi corp vault in the cli with signed key for ssh run:
+```sh
+SIGNED=$(vault write -field=signed_key ssh/sign/user public_key="$(cat ~/.ssh/vault.pub)")
+  echo "$SIGNED" > ~/.ssh/vault-signed.pub
+  ssh-keygen -L -f ~/.ssh/vault-signed.pub
+```

@@ -4,3 +4,9 @@
     cmd: docker compose up -d --force-recreate --remove-orphans
     chdir: "{{ homelab_base_dir }}/services/hcvault"
   become_user: "{{ deploy_user }}"
+
+- name: restart sshd
+  service:
+    name: sshd
+    state: restarted
+  become: true

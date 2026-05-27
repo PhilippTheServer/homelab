@@ -347,6 +347,27 @@
       "optionalClientScopes": ["address", "phone", "offline_access", "microprofile-jwt"]
     },
     {
+      "clientId": "hcvault",
+      "name": "HashiCorp Vault",
+      "enabled": true,
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "{{ vault_hcvault_oidc_secret }}",
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "protocol": "openid-connect",
+      "redirectUris": [
+        "https://vault.{{ internal_subdomain }}.{{ domain }}/ui/vault/auth/oidc/oidc/callback",
+        "http://localhost:8250/oidc/callback"
+      ],
+      "webOrigins": ["+"],
+      "fullScopeAllowed": true,
+      "defaultClientScopes": ["web-origins", "acr", "profile", "roles", "email", "basic"],
+      "optionalClientScopes": ["address", "phone", "offline_access", "microprofile-jwt", "groups"]
+    },
+    {
       "clientId": "vaultwarden",
       "name": "Vaultwarden",
       "enabled": true,

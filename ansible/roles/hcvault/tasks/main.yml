@@ -38,3 +38,6 @@
     chdir: "{{ homelab_base_dir }}/services/hcvault"
   become_user: "{{ deploy_user }}"
   changed_when: false
+
+- name: Configure Vault (engines, auth, policies, SSH CA)
+  import_tasks: configure.yml
