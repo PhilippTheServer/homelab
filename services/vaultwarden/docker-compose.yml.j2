@@ -13,7 +13,7 @@ services:
       INVITATIONS_ALLOWED: "true"
       # OIDC SSO via Keycloak
       SSO_ENABLED: "true"
-      SSO_AUTHORITY: "https://auth.{{ internal_subdomain }}.{{ domain }}/realms/homelab"
+      SSO_AUTHORITY: "https://auth.{{ domain }}/realms/homelab"
       SSO_CLIENT_ID: "vaultwarden"
       SSO_CLIENT_SECRET: "{{ vault_vaultwarden_oidc_secret }}"
     volumes:

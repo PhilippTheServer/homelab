@@ -19,7 +19,8 @@ services:
       - --entrypoints.web.http.redirections.entrypoint.to=websecure
       - --entrypoints.web.http.redirections.entrypoint.scheme=https
       - --entrypoints.websecure.address=:443
-      - --entrypoints.websecure.http2.enabled=false
+      - --providers.file.directory=/etc/traefik/dynamic
+      - --providers.file.watch=true
       # Let's Encrypt via Cloudflare DNS challenge
       - --certificatesresolvers.letsencrypt.acme.email={{ traefik_acme_email }}
       - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
@@ -42,6 +43,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - traefik_letsencrypt:/letsencrypt
+      - {{ homelab_base_dir }}/services/traefik/dynamic:/etc/traefik/dynamic:ro
     networks:
       - proxy
     labels:

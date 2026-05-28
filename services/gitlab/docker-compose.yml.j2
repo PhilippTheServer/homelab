@@ -42,7 +42,7 @@ services:
               'name' => 'openid_connect',
               'scope' => ['openid', 'profile', 'email'],
               'response_type' => 'code',
-              'issuer' => 'https://auth.{{ internal_subdomain }}.{{ domain }}/realms/homelab',
+              'issuer' => 'https://auth.{{ domain }}/realms/homelab',
               'discovery' => true,
               'client_auth_method' => 'query',
               'uid_field' => 'preferred_username',

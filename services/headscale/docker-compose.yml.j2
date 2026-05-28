@@ -21,11 +21,9 @@ services:
       - "traefik.http.routers.headscale.rule=Host(`vpn.{{ domain }}`)"
       - "traefik.http.routers.headscale.entrypoints=websecure"
       - "traefik.http.routers.headscale.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.headscale.tls.options=no-h2@file"
       - "traefik.http.services.headscale.loadbalancer.server.port=8080"
       - "traefik.docker.network=proxy"
-      - "traefik.http.middlewares.headscale-ws.headers.customrequestheaders.Upgrade=websocket"
-      - "traefik.http.middlewares.headscale-ws.headers.customrequestheaders.Connection=Upgrade"
-      - "traefik.http.routers.headscale.middlewares=headscale-ws"
 
   headplane:
     image: ghcr.io/tale/headplane:latest

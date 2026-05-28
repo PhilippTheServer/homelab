@@ -33,7 +33,7 @@
     docker exec
     -e VAULT_TOKEN="{{ vault_hcvault_root_token }}"
     vault vault write auth/oidc/config
-    oidc_discovery_url="https://auth.{{ internal_subdomain }}.{{ domain }}/realms/homelab"
+    oidc_discovery_url="https://auth.{{ domain }}/realms/homelab"
     oidc_client_id="hcvault"
     oidc_client_secret="{{ vault_hcvault_oidc_secret }}"
     default_role="admin"
