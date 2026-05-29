@@ -19,6 +19,15 @@
     mode: '0640'
   notify: restart traefik
 
+- name: Render ddclient config
+  template:
+    src: "{{ playbook_dir }}/../services/traefik/ddclient.conf.j2"
+    dest: "{{ homelab_base_dir }}/services/traefik/ddclient.conf"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: '0640'
+  notify: restart traefik
+
 - name: Render traefik dynamic TLS options
   template:
     src: "{{ playbook_dir }}/../services/traefik/dynamic/tls-options.yaml.j2"
