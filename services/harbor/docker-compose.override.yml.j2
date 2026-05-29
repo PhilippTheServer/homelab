@@ -1,0 +1,21 @@
+networks:
+  proxy:
+    external: true
+
+services:
+  proxy:
+    networks:
+      - harbor
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.harbor.rule=Host(`harbor.{{ internal_subdomain }}.{{ domain }}`)"
+      - "traefik.http.routers.harbor.entrypoints=websecure"
+      - "traefik.http.routers.harbor.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.harbor.service=harbor"
+      - "traefik.http.routers.registry.rule=Host(`registry.{{ internal_subdomain }}.{{ domain }}`)"
+      - "traefik.http.routers.registry.entrypoints=websecure"
+      - "traefik.http.routers.registry.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.registry.service=harbor"
+      - "traefik.http.services.harbor.loadbalancer.server.port=18080"
+      - "traefik.docker.network=proxy"

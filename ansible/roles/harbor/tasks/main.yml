@@ -1,0 +1,89 @@
+---
+- name: Download Harbor online installer
+  get_url:
+    url: "https://github.com/goharbor/harbor/releases/download/{{ harbor_version }}/harbor-online-installer-{{ harbor_version }}.tgz"
+    dest: "/tmp/harbor-{{ harbor_version }}.tgz"
+    mode: '0644'
+
+- name: Extract Harbor installer
+  unarchive:
+    src: "/tmp/harbor-{{ harbor_version }}.tgz"
+    dest: "{{ homelab_base_dir }}"
+    remote_src: true
+    creates: "{{ homelab_base_dir }}/harbor/install.sh"
+
+- name: Create Harbor data and log directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "{{ homelab_base_dir }}/harbor/data"
+    - "{{ homelab_base_dir }}/harbor/log"
+
+- name: Template harbor.yml
+  template:
+    src: "{{ playbook_dir }}/../services/harbor/harbor.yml.j2"
+    dest: "{{ homelab_base_dir }}/harbor/harbor.yml"
+    mode: '0640'
+  notify: restart harbor
+
+- name: Template docker-compose.override.yml
+  template:
+    src: "{{ playbook_dir }}/../services/harbor/docker-compose.override.yml.j2"
+    dest: "{{ homelab_base_dir }}/harbor/docker-compose.override.yml"
+    mode: '0644'
+  notify: restart harbor
+
+- name: Initial Harbor prepare (generates configs from harbor.yml)
+  command:
+    cmd: "./prepare"
+    chdir: "{{ homelab_base_dir }}/harbor"
+  args:
+    creates: "{{ homelab_base_dir }}/harbor/common/config/nginx/nginx.conf"
+
+- name: Ensure Harbor stack is running
+  command:
+    cmd: docker compose -f docker-compose.yml -f docker-compose.override.yml up -d --remove-orphans
+    chdir: "{{ homelab_base_dir }}/harbor"
+  changed_when: false
+
+- name: Wait for Harbor API to be ready
+  uri:
+    url: "http://localhost:18080/api/v2.0/systeminfo"
+    status_code: 200
+  register: _harbor_ready
+  retries: 30
+  delay: 10
+  until: _harbor_ready.status == 200
+
+- name: Get current Harbor auth configuration
+  uri:
+    url: "http://localhost:18080/api/v2.0/configurations"
+    method: GET
+    user: admin
+    password: "{{ vault_harbor_admin_password }}"
+    force_basic_auth: true
+  register: _harbor_cfg
+
+- name: Configure Harbor OIDC (Keycloak)
+  uri:
+    url: "http://localhost:18080/api/v2.0/configurations"
+    method: PUT
+    user: admin
+    password: "{{ vault_harbor_admin_password }}"
+    force_basic_auth: true
+    body_format: json
+    body:
+      auth_mode: "oidc_auth"
+      oidc_name: "Keycloak"
+      oidc_endpoint: "https://auth.{{ domain }}/realms/homelab"
+      oidc_client_id: "harbor"
+      oidc_client_secret: "{{ vault_harbor_oidc_secret }}"
+      oidc_scope: "openid,profile,email,groups"
+      oidc_verify_cert: true
+      oidc_auto_onboard: true
+      oidc_user_claim: "preferred_username"
+      oidc_groups_claim: "groups"
+    status_code: 200
+  when: _harbor_cfg.json.auth_mode.value != 'oidc_auth'
