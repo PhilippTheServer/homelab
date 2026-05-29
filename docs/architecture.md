@@ -166,6 +166,7 @@ homelab/
 │   │   └── vars.yml          # domain, IPs, service versions, HCVault lookups
 │   ├── roles/
 │   │   ├── common/           # Docker, UFW, deploy user
+│   │   ├── docker-log-limit/ # Docker daemon log rotation
 │   │   ├── traefik/          # reverse proxy + SSL + ddclient DDNS
 │   │   ├── keycloak/
 │   │   ├── headscale/
@@ -200,8 +201,9 @@ homelab/
 ### Bootstrap Order
 
 ```
-common      → Docker, UFW, system users
-traefik     → SSL + DDNS (infrastructure prerequisite)
+common            → Docker, UFW, system users
+docker-log-limit  → daemon log rotation (5 MB per container)
+traefik           → SSL + DDNS (infrastructure prerequisite)
 keycloak    → SSO (configure realm + OIDC clients before continuing)
 headscale   → VPN (remote access live after this step)
 hcvault     → secrets automation + store Vault unseal keys in Vaultwarden

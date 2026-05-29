@@ -76,13 +76,6 @@
     mode: '0644'
     force: false
 
-- name: Download cAdvisor container dashboard
-  get_url:
-    url: "https://grafana.com/api/dashboards/14282/revisions/latest/download"
-    dest: "{{ homelab_base_dir }}/services/monitoring/grafana/dashboards/cadvisor.json"
-    mode: '0644'
-    force: false
-
 - name: Ensure monitoring stack is running
   command:
     cmd: docker compose up -d --remove-orphans

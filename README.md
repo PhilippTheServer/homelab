@@ -55,6 +55,7 @@ Each Ansible role also has its own README:
 | Role | README |
 |---|---|
 | common | [ansible/roles/common/README.md](ansible/roles/common/README.md) |
+| docker-log-limit | [ansible/roles/docker-log-limit/README.md](ansible/roles/docker-log-limit/README.md) |
 | traefik | [ansible/roles/traefik/README.md](ansible/roles/traefik/README.md) |
 | keycloak | [ansible/roles/keycloak/README.md](ansible/roles/keycloak/README.md) |
 | headscale | [ansible/roles/headscale/README.md](ansible/roles/headscale/README.md) |
@@ -192,6 +193,7 @@ homelab/
 │   │   └── vars.yml               # config (domain, versions, IPs) + Vault lookups
 │   ├── roles/
 │   │   ├── common/                # Docker, UFW, deploy user
+│   │   ├── docker-log-limit/      # Docker daemon log rotation
 │   │   ├── traefik/               # reverse proxy + SSL + ddclient DDNS
 │   │   ├── keycloak/              # SSO
 │   │   ├── headscale/             # VPN

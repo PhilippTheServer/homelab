@@ -7,6 +7,9 @@
 #    - role: common
 #      tags: [common]
 
+    - role: docker-log-limit
+      tags: [docker-log-limit]
+
     - role: traefik
       tags: [traefik]
 
