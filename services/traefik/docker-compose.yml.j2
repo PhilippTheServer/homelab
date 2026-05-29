@@ -59,17 +59,24 @@ services:
       - "traefik.http.middlewares.traefik-auth.basicauth.users={{ vault_traefik_dashboard_auth | replace('$', '$$') }}"
       - "traefik.http.services.traefik-dashboard.loadbalancer.server.port=8080"
 
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    container_name: cloudflared
+  cloudflare-ddns:
+    image: favonia/cloudflare-ddns:latest
+    container_name: cloudflare-ddns
     restart: unless-stopped
-    command: tunnel --no-autoupdate --config /etc/cloudflared/config.yaml run
+    network_mode: host
+    read_only: true
+    cap_drop:
+      - all
+    security_opt:
+      - no-new-privileges:true
     environment:
-      TUNNEL_TOKEN: "{{ vault_cloudflare_tunnel_token }}"
-    volumes:
-      - {{ homelab_base_dir }}/services/traefik/cloudflared-config.yaml:/etc/cloudflared/config.yaml:ro
-    networks:
-      - proxy
+      CF_API_TOKEN: "{{ vault_cloudflare_ddns_token }}"
+      DOMAINS: "vpn.{{ domain }}"
+      PROXIED: "false"
+      UPDATE_CRON: "@every 5m"
+      IP6_PROVIDER: "local"
+      # Set IP4_PROVIDER to "cloudflare" if you have a real public IPv4, otherwise keep "none"
+      IP4_PROVIDER: "none"
 
 networks:
   proxy:

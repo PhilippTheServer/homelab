@@ -17,7 +17,7 @@ services:
       - internal
     labels:
       - "traefik.enable=true"
-      # Headscale lives at vpn.<domain> (public, via Cloudflare Tunnel — not under home.<domain>)
+      # Headscale lives at vpn.<domain> (public, direct via port-forward — not under home.<domain>)
       - "traefik.http.routers.headscale.rule=Host(`vpn.{{ domain }}`)"
       - "traefik.http.routers.headscale.entrypoints=websecure"
       - "traefik.http.routers.headscale.tls.certresolver=letsencrypt"
