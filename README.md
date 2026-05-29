@@ -246,7 +246,8 @@ homelab/
 │   │   ├── vaultwarden/           # Bitwarden-compatible password manager
 │   │   ├── pihole/                # DNS + DHCP
 │   │   ├── gitlab/                # Git + CI/CD
-│   │   └── harbor/                # Docker registry
+│   │   ├── harbor/                # Docker registry
+│   │   └── homepage/              # Dashboard
 │   └── site.yml                   # master playbook
 ├── services/
 │   ├── traefik/                   # includes ddclient DDNS sidecar
@@ -256,7 +257,8 @@ homelab/
 │   ├── vaultwarden/
 │   ├── pihole/
 │   ├── gitlab/
-│   └── harbor/
+│   ├── harbor/
+│   └── homepage/
 ├── README.md
 ├── INFRASTRUCTURE.md              # network diagram + architecture decisions
 ├── DDNS.md                        # DDNS setup, Namecheap config, cert issuance
@@ -265,6 +267,39 @@ homelab/
 ```
 
 </details>
+
+---
+
+## Role Documentation
+
+Each Ansible role has its own README covering overview, containers, configuration files, required secrets, URL, and operational notes.
+
+```
+ansible/roles/
+├── common/README.md       — Docker, UFW firewall, deploy user, proxy network
+├── traefik/README.md      — Reverse proxy, wildcard TLS, ddclient DDNS
+├── keycloak/README.md     — SSO / OIDC identity provider
+├── headscale/README.md    — Self-hosted Tailscale VPN control plane + Headplane UI
+├── hcvault/README.md      — Secrets management, AppRole CI/CD auth, SSH CA
+├── vaultwarden/README.md  — Bitwarden-compatible password manager
+├── pihole/README.md       — DNS + DHCP + ad blocking + internal name resolution
+├── gitlab/README.md       — Git hosting + CI/CD pipelines + GitLab Runner
+├── harbor/README.md       — Docker container image registry
+└── homepage/README.md     — Homelab dashboard with OIDC-protected access
+```
+
+| Role | README |
+|---|---|
+| common | [ansible/roles/common/README.md](ansible/roles/common/README.md) |
+| traefik | [ansible/roles/traefik/README.md](ansible/roles/traefik/README.md) |
+| keycloak | [ansible/roles/keycloak/README.md](ansible/roles/keycloak/README.md) |
+| headscale | [ansible/roles/headscale/README.md](ansible/roles/headscale/README.md) |
+| hcvault | [ansible/roles/hcvault/README.md](ansible/roles/hcvault/README.md) |
+| vaultwarden | [ansible/roles/vaultwarden/README.md](ansible/roles/vaultwarden/README.md) |
+| pihole | [ansible/roles/pihole/README.md](ansible/roles/pihole/README.md) |
+| gitlab | [ansible/roles/gitlab/README.md](ansible/roles/gitlab/README.md) |
+| harbor | [ansible/roles/harbor/README.md](ansible/roles/harbor/README.md) |
+| homepage | [ansible/roles/homepage/README.md](ansible/roles/homepage/README.md) |
 
 ---
 
