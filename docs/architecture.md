@@ -1,6 +1,4 @@
-# Homelab Infrastructure
-
-## Overview
+# Architecture
 
 A home network built on a single mini PC running Debian 13 with Docker. All services are managed as Infrastructure as Code (Ansible + Docker Compose). Each service stack is fully self-contained with its own database — stacks can be developed, replaced, or torn down independently.
 
@@ -29,6 +27,7 @@ graph TD
         VW["Vaultwarden\nPassword manager\n+ Postgres"]
         GL["GitLab CE\nGit · CI/CD\n+ Postgres + Redis"]
         HB["Harbor\nDocker Registry\n+ Postgres + Redis"]
+        HP["Homepage\nDashboard"]
     end
 
     subgraph LAN ["Local Network — 192.168.178.0/24"]
@@ -56,7 +55,7 @@ graph TD
     V1 & V2 -->|"Tailscale/Headscale\nVPN mesh"| HS
     V1 & V2 -->|"HTTPS via VPN"| Traefik
 
-    Traefik --> KC & HS & HCV & VW & GL & HB & PH
+    Traefik --> KC & HS & HCV & VW & GL & HB & PH & HP
 ```
 
 ---
@@ -65,11 +64,13 @@ graph TD
 
 | From | How | What's accessible |
 |---|---|---|
-| Local LAN | Direct (192.168.178.0/24) | All `*.home.philippthesurfer.com` services |
+| Local LAN | Direct (192.168.178.0/24) | All `*.home.philippthesurfer.com` services + Pi-hole at `:8080` |
 | Remote (VPN) | Headscale mesh → Traefik | All `*.home.philippthesurfer.com` services |
 | Public internet | TCP 443 → FritzBox → Traefik → Headscale | Only `vpn.philippthesurfer.com` (Headscale control plane) |
 
 `*.home.philippthesurfer.com` records resolve to the Mini PC LAN IP via Pi-hole and are unreachable from outside the LAN or VPN. Traefik terminates TLS directly — no tunnel or third-party proxy sits between the client and the server.
+
+**Exception:** Keycloak sits at `auth.philippthesurfer.com` (no `.home.` subdomain) so OIDC redirect URIs work from any device, including those not on the LAN or VPN. The DNS record is still private, but the URL scheme is consistent with public OIDC flows.
 
 ---
 
@@ -77,19 +78,18 @@ graph TD
 
 Each stack is an independent Docker Compose file with its own database.
 
+### Keycloak (Priority 1 — SSO foundation)
+- **Role:** Single sign-on identity provider — all services authenticate through here
+- **Auth:** All services use OIDC/OAuth2 against Keycloak. No service has its own user database.
+- **Database:** Dedicated Postgres container on an internal-only network
+- **Compose:** `services/keycloak/docker-compose.yml`
+- **Note:** First service to configure. Create the `homelab` realm and all OIDC clients here before deploying dependent services.
+
 ### Traefik + ddclient (Priority 2 — infrastructure)
 - **Role:** Reverse proxy for all internal services, wildcard SSL, DDNS updater sidecar
 - **SSL:** Let's Encrypt wildcard cert via Namecheap DNS API — DNS challenge allows issuing `*.home.philippthesurfer.com` without exposing internal domains publicly
 - **DDNS:** `ddclient` container runs alongside Traefik, updates the `vpn.philippthesurfer.com` A record every 5 minutes via Namecheap's DDNS service
 - **Compose:** `services/traefik/docker-compose.yml`
-- **Note:** Must be deployed before any HTTPS service, but after Keycloak is configured
-
-### Keycloak (Priority 1 — SSO foundation)
-- **Role:** Single sign-on identity provider — all services authenticate through here
-- **Auth:** All services use OIDC/OAuth2 against Keycloak. No service has its own user database.
-- **Database:** Dedicated Postgres container in the same stack
-- **Compose:** `services/keycloak/docker-compose.yml`
-- **Note:** First service to configure. Create the `homelab` realm and all OIDC clients here before deploying dependent services.
 
 ### Headscale (Priority 2 — remote access)
 - **Role:** Self-hosted Tailscale control plane, VPN mesh for remote access
@@ -113,22 +113,29 @@ Each stack is an independent Docker Compose file with its own database.
 
 ### Pi-hole (Priority 4)
 - **Role:** Network-wide DNS server + DHCP, ad/tracker blocking, internal DNS for `*.home.philippthesurfer.com`
+- **Network mode:** `host` — binds to port 53 and supports DHCP broadcasts, so it is **not** routed through Traefik
 - **Internal DNS:** All `*.home.philippthesurfer.com` records point to Mini PC LAN IP — no split-DNS hairpin
-- **Upstream DNS:** Cloudflare `1.1.1.1`
+- **Upstream DNS:** Cloudflare `1.1.1.1`, Google `8.8.8.8`
 - **Compose:** `services/pihole/docker-compose.yml`
 
 ### GitLab CE (Priority 4)
 - **Role:** Git hosting, CI/CD pipelines, IaC source of truth after bootstrap
 - **Auth:** OIDC via Keycloak
 - **Database:** Dedicated Postgres + Redis containers in the same stack
-- **Runners:** GitLab Runner container, 1-2 concurrent builds (16 GB RAM constraint)
+- **Runners:** GitLab Runner container, 1–2 concurrent builds (16 GB RAM constraint)
 - **Compose:** `services/gitlab/docker-compose.yml`
 
 ### Harbor (Priority 4)
 - **Role:** Docker image registry — GitLab CI pushes images here
 - **Auth:** OIDC via Keycloak
-- **Database:** Dedicated Postgres + Redis containers in the same stack
-- **Compose:** `services/harbor/docker-compose.yml`
+- **Setup:** Uses Harbor's official online installer (not a plain compose file). The `prepare` script generates internal compose config from `harbor.yml`.
+- **Database:** Built-in Postgres + Redis managed by the Harbor installer
+- **Compose:** `services/harbor/harbor.yml` + `services/harbor/docker-compose.override.yml`
+
+### Homepage (Priority 4)
+- **Role:** Homelab dashboard — aggregates all service links, Docker container status, and system widgets
+- **Auth:** OIDC via Keycloak
+- **Compose:** `services/homepage/docker-compose.yml`
 
 ---
 
@@ -139,9 +146,10 @@ Each stack is an independent Docker Compose file with its own database.
 | Host provisioning | Ansible | Docker, UFW, system users, directories |
 | Secrets | HashiCorp Vault | All credentials in Vault KV v2 (`secret/ansible`); fetched at runtime via `community.hashi_vault` — nothing sensitive in the repo |
 | Service deployment | Docker Compose (Jinja2 templates) | Ansible renders and deploys each stack |
-| CI/CD | GitLab CI | Re-deploys stacks after bootstrap |
+| CI/CD | GitLab CI | Re-deploys stacks after bootstrap; authenticates to Vault via AppRole |
 
 ### Repo Layout
+
 ```
 homelab/
 ├── ansible/
@@ -157,7 +165,8 @@ homelab/
 │   │   ├── vaultwarden/
 │   │   ├── pihole/
 │   │   ├── gitlab/
-│   │   └── harbor/
+│   │   ├── harbor/
+│   │   └── homepage/
 │   └── site.yml
 ├── services/
 │   ├── traefik/
@@ -167,14 +176,19 @@ homelab/
 │   ├── vaultwarden/
 │   ├── pihole/
 │   ├── gitlab/
-│   └── harbor/
-├── README.md
-├── INFRASTRUCTURE.md
-├── DDNS.md
-└── BOOTSTRAP.md
+│   ├── harbor/
+│   └── homepage/
+├── docs/
+│   ├── architecture.md       # this file
+│   ├── bootstrap.md          # step-by-step first deploy
+│   ├── ddns.md               # DDNS + TLS cert details
+│   ├── vault.md              # Vault CLI, SSH certs, secrets management
+│   └── operations.md         # day-to-day ops reference
+└── README.md
 ```
 
 ### Bootstrap Order
+
 ```
 common      → Docker, UFW, system users
 traefik     → SSL + DDNS (infrastructure prerequisite)
@@ -185,6 +199,7 @@ vaultwarden → password manager
 pihole      → DNS + DHCP
 gitlab      → push this repo to GitLab; CI takes over re-deploys
 harbor      → registry
+homepage    → dashboard
 ```
 
 ---
@@ -215,19 +230,10 @@ Pi-hole DNS → Mini PC LAN IP → Traefik → service
 ### CI/CD pipeline
 ```
 git push → GitLab → Runner builds image → pushes to Harbor
-GitLab CI → ansible-playbook → docker compose pull + up → service updated
+GitLab CI → AppRole login to Vault → fetch secrets → ansible-playbook → docker compose pull + up → service updated
 ```
 
 ### SSO login
 ```
-User → service → redirect to auth.home.philippthesurfer.com (Keycloak) → authenticate → token → service
+User → service → redirect to auth.philippthesurfer.com (Keycloak) → authenticate → token → service
 ```
-
----
-
-## Open Questions / To Clarify
-
-- Fritz Box DHCP: fully disabled in favour of Pi-hole, or running alongside?
-- HashiCorp Vault auto-unseal strategy (cloud KMS vs. manual) — needed after any reboot
-- GitLab Runner concurrent build limit (default: 1, increase carefully given 16 GB RAM)
-- IPv6: ISP provides native IPv6 but Namecheap DDNS only updates A records; AAAA record requires Namecheap API — not yet configured

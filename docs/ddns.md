@@ -1,7 +1,6 @@
 # DDNS & External Access
 
-This document describes how `vpn.philippthesurfer.com` is kept reachable from the internet
-despite a dynamic home IP, and how TLS certificates are issued for all homelab domains.
+How `vpn.philippthesurfer.com` is kept reachable from the internet despite a dynamic home IP, and how TLS certificates are issued for all homelab domains.
 
 ---
 
@@ -14,7 +13,7 @@ External client
 Namecheap DNS  ←─── ddclient updates A record every 5 min
     │ resolves vpn.philippthesurfer.com → home public IP
     ▼
-FritzBox  ←─── port forwarding: TCP 443, TCP/UDP 80, UDP 3478 → 192.168.178.20
+FritzBox  ←─── port forwarding: TCP 443, TCP 80, UDP 3478 → 192.168.178.20
     ▼
 Traefik (192.168.178.20:443)  ←─── TLS termination, Let's Encrypt cert
     ▼
@@ -33,12 +32,9 @@ Traefik terminates TLS directly; the public IP is the home router's WAN address.
 **Image:** `lscr.io/linuxserver/ddclient:latest`  
 **Config:** `/opt/homelab/services/traefik/ddclient.conf` (rendered by Ansible from `services/traefik/ddclient.conf.j2`)
 
-Every 5 minutes ddclient fetches the current public IPv4 from `icanhazip.com` and calls
-Namecheap's DDNS endpoint to update the A record for `vpn.philippthesurfer.com`.
-If the IP has not changed since the last update, Namecheap ignores the call.
+Every 5 minutes ddclient fetches the current public IPv4 from `icanhazip.com` and calls Namecheap's DDNS endpoint to update the A record for `vpn.philippthesurfer.com`. If the IP has not changed since the last update, Namecheap ignores the call.
 
-The DDNS update uses a separate **DDNS password** (not the Namecheap account password
-and not the API key). It is found at:
+The DDNS update uses a separate **DDNS password** (not the Namecheap account password and not the API key). It is found at:
 > Namecheap → Domain List → Manage `philippthesurfer.com` → Advanced DNS → Dynamic DNS
 
 ```
@@ -60,27 +56,22 @@ docker logs ddclient
 **Image:** `traefik:v3.7`  
 **Entrypoints:** `:80` (HTTP → redirect to HTTPS), `:443` (HTTPS)
 
-Traefik issues and renews all TLS certificates via Let's Encrypt using the
-**Namecheap DNS-01 challenge**. This means Let's Encrypt asks Traefik to temporarily
-create a `_acme-challenge` TXT record in Namecheap DNS to prove domain ownership.
-DNS-01 is required because:
+Traefik issues and renews all TLS certificates via Let's Encrypt using the **Namecheap DNS-01 challenge**. Let's Encrypt asks Traefik to temporarily create a `_acme-challenge` TXT record in Namecheap DNS to prove domain ownership. DNS-01 is required because:
 - The wildcard cert `*.home.philippthesurfer.com` can only be issued via DNS challenge
-- Internal services (`*.home.philippthesurfer.com`) are not publicly reachable, so
-  HTTP-01 challenge cannot be used for them
+- Internal services (`*.home.philippthesurfer.com`) are not publicly reachable, so HTTP-01 challenge cannot be used for them
 
 **Certificates issued:**
+
 | Domain | Type | Used by |
 |--------|------|---------|
 | `vpn.philippthesurfer.com` | individual | Headscale |
 | `home.philippthesurfer.com` + `*.home.philippthesurfer.com` | wildcard | all internal services |
 
-Certs are stored in the `traefik_letsencrypt` Docker volume (`acme.json`) and
-renewed automatically ~30 days before expiry.
+Certs are stored in the `traefik_letsencrypt` Docker volume (`acme.json`) and renewed automatically ~30 days before expiry.
 
 ### FritzBox — port forwarding
 
-Navigate to **http://fritz.box → Internet → Permit Access → Port Sharing**.
-All rules target `192.168.178.20` (the homelab miniPC):
+Navigate to **http://fritz.box → Internet → Permit Access → Port Sharing**. All rules target `192.168.178.20`:
 
 | Protocol | External port | Purpose |
 |----------|--------------|---------|
@@ -88,28 +79,25 @@ All rules target `192.168.178.20` (the homelab miniPC):
 | TCP | 80 | Let's Encrypt HTTP (fallback) |
 | UDP | 3478 | STUN — Tailscale NAT traversal |
 
-FritzBox creates both an IPv4 NAT rule and an IPv6 firewall allow rule from a single
-port sharing entry, so the same rules cover both protocols.
+FritzBox creates both an IPv4 NAT rule and an IPv6 firewall allow rule from a single port sharing entry, so the same rules cover both protocols.
 
 ---
 
-## Required credentials
+## Required Credentials
 
-All secrets live in HashiCorp Vault at `secret/data/ansible` and are fetched at runtime via the `community.hashi_vault` Ansible lookup.
+All secrets live in HashiCorp Vault at `secret/ansible` and are fetched at runtime via the `community.hashi_vault` Ansible lookup.
 
-| Vault variable | What it is | Where to find it |
+| Vault field | What it is | Where to find it |
 |----------------|-----------|-----------------|
-| `vault_namecheap_api_user` | Namecheap account username | Namecheap login |
-| `vault_namecheap_api_key` | Namecheap API key | Profile → Tools → API Access |
-| `vault_namecheap_ddns_password` | DDNS password (separate from API key) | Domain List → Manage → Advanced DNS → Dynamic DNS |
+| `namecheap_api_user` | Namecheap account username | Namecheap login |
+| `namecheap_api_key` | Namecheap API key | Profile → Tools → API Access |
+| `namecheap_ddns_password` | DDNS password (separate from API key) | Domain List → Manage → Advanced DNS → Dynamic DNS |
 
 ---
 
-## Namecheap prerequisites
+## Namecheap Prerequisites
 
 ### API access (for Let's Encrypt DNS challenge)
-
-The Namecheap API is used by Traefik/lego to create and delete `_acme-challenge` TXT records.
 
 1. Go to **Profile → Tools → API Access**
 2. Confirm your API key is visible
@@ -117,19 +105,17 @@ The Namecheap API is used by Traefik/lego to create and delete `_acme-challenge`
    ```bash
    curl -4 -s https://icanhazip.com
    ```
-4. If your IP changes and cert renewal fails, update the whitelist and Traefik will
-   retry on the next renewal cycle. Let's Encrypt certs are valid for 90 days;
-   Traefik starts renewing at 60 days, so there is a 30-day window to fix a stale whitelist.
+4. If your IP changes and cert renewal fails, update the whitelist and Traefik will retry on the next renewal cycle. Let's Encrypt certs are valid for 90 days; Traefik starts renewing at 60 days, so there is a 30-day window to fix a stale whitelist.
 
 ### DDNS enabled
 
 1. Go to **Domain List → Manage `philippthesurfer.com` → Advanced DNS**
 2. Ensure **Dynamic DNS** is toggled on
-3. The DDNS password shown there must match `vault_namecheap_ddns_password`
+3. The DDNS password shown there must match `namecheap_ddns_password` in Vault
 
 ---
 
-## Ansible deployment
+## Ansible Deployment
 
 The traefik Ansible role renders both the docker-compose and the ddclient config:
 
@@ -178,8 +164,7 @@ curl --http1.1 -sv \
 ```bash
 docker exec ddclient ddclient -verbose -noquiet
 ```
-If `icanhazip.com` returns a `100.x.x.x` address your ISP is using CGNAT for IPv4
-and external IPv4 access is not possible — IPv6 is required instead.
+If `icanhazip.com` returns a `100.x.x.x` address, your ISP is using CGNAT for IPv4 and external IPv4 access is not possible — IPv6 is required instead.
 
 **Let's Encrypt cert request fails**
 - Check Traefik logs: `docker logs traefik | grep -i acme`

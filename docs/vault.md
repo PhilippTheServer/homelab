@@ -2,7 +2,7 @@
 
 This homelab uses HashiCorp Vault for two distinct purposes:
 
-1. **Secrets store** — all service credentials live at `secret/data/ansible`; Ansible fetches them at runtime so nothing sensitive is ever committed to the repo
+1. **Secrets store** — all service credentials live at `secret/ansible`; Ansible fetches them at runtime so nothing sensitive is ever committed to the repo
 2. **SSH certificate authority** — Vault signs short-lived SSH certificates instead of distributing static keys; every SSH session is audited and time-limited
 
 Vault lives at `vault.home.philippthesurfer.com` (LAN/VPN only — never public).  
@@ -75,7 +75,7 @@ vault version
 
 ---
 
-## Connect and authenticate
+## Connect and Authenticate
 
 Point the CLI at your Vault instance. Add this to your shell profile (`.zshrc`, `.bashrc`, or Windows environment variables) so it persists across sessions:
 
@@ -105,7 +105,7 @@ vault token revoke -self
 
 ---
 
-## SSH certificate setup
+## SSH Certificate Setup
 
 Instead of distributing static authorized keys, Vault acts as an SSH CA. You generate a key pair once, and before each session you ask Vault to sign your public key. The host trusts any certificate signed by the Vault CA — so adding new machines or rotating keys requires no coordination.
 
@@ -237,7 +237,6 @@ ssh minipc.home.philippthesurfer.com
 **Optional — set VAULT_ADDR permanently:**
 
 ```powershell
-# Adds it to your user environment (persists across sessions)
 [System.Environment]::SetEnvironmentVariable("VAULT_ADDR", "https://vault.home.philippthesurfer.com", "User")
 ```
 
@@ -245,7 +244,7 @@ ssh minipc.home.philippthesurfer.com
 
 ---
 
-## Daily SSH workflow
+## Daily SSH Workflow
 
 Every morning (or whenever your token expires):
 
@@ -265,7 +264,7 @@ Steps 1–2 can be combined into the `vault-ssh-refresh` shell function shown in
 
 ---
 
-## Managing secrets
+## Managing Secrets
 
 All homelab secrets live in a single KV v2 secret at the path `secret/ansible`.  
 KV v2 keeps full version history — every `put`/`patch` creates a new version, old versions remain recoverable.
@@ -322,7 +321,7 @@ vault kv put secret/ansible @/tmp/vault-secrets.json
 rm /tmp/vault-secrets.json
 ```
 
-> **Never leave secrets in temp files longer than necessary.** Consider using `shred` or macOS `srm` to securely delete.
+> **Never leave secrets in temp files longer than necessary.** Use `shred` or macOS `srm` to securely delete.
 
 ### Delete a secret version
 
@@ -340,7 +339,7 @@ vault kv metadata delete secret/ansible
 
 ---
 
-## Using secrets in Ansible
+## Using Secrets in Ansible
 
 ### How it works
 
@@ -370,13 +369,13 @@ The `community.hashi_vault.hashi_vault` lookup plugin (from `ansible/requirement
 
 ### The secrets section of vars.yml
 
-`ansible/group_vars/all/vars.yml` contains a secrets block at the bottom that maps the `vault_*` variable names that templates reference to fields in the HC Vault KV entry. A single lookup fetches all fields at once — no per-variable round-trips:
+`ansible/group_vars/all/vars.yml` contains a secrets block at the bottom that maps the `vault_*` variable names to fields in the Vault KV entry:
 
 ```yaml
 _vault_secrets: "{{ lookup('community.hashi_vault.hashi_vault', 'secret/data/ansible') }}"
 
-vault_minipc_passwd:            "{{ _vault_secrets.minipc_passwd }}"
-vault_namecheap_api_user:       "{{ _vault_secrets.namecheap_api_user }}"
+vault_namecheap_api_user:  "{{ _vault_secrets.namecheap_api_user }}"
+vault_namecheap_api_key:   "{{ _vault_secrets.namecheap_api_key }}"
 # ... (full list in vars.yml)
 ```
 
@@ -390,7 +389,7 @@ auth_method = token
 
 `auth_method = token` means the plugin reads from `VAULT_TOKEN` env var first, then falls back to `~/.vault-token`.
 
-> **Note on `vault_hcvault_root_token`:** this variable is intentionally absent from the lookup list. The `hcvault` configure tasks pass the operator's `VAULT_TOKEN` env var directly into `docker exec` — using the same token Ansible already needs to run the play. Storing the root token inside Vault itself would be circular.
+> **Note on the root token:** The `hcvault` configure tasks pass the operator's `VAULT_TOKEN` env var directly into `docker exec`. The root token is never stored as a Vault secret itself — that would be circular.
 
 ### Running playbooks
 
@@ -463,8 +462,6 @@ vault_ntfy_admin_password: "{{ _vault_secrets.ntfy_admin_password }}"
 ```yaml
 # services/ntfy/docker-compose.yml.j2
 environment:
-  NTFY_AUTH_DEFAULT_ACCESS: "deny-all"
-  NTFY_AUTH_FILE: /var/lib/ntfy/user.db
   NTFY_ADMIN_PASSWORD: "{{ vault_ntfy_admin_password }}"
 ```
 
@@ -472,7 +469,7 @@ environment:
 
 ---
 
-## Quick reference
+## Quick Reference
 
 | Task | Command |
 |---|---|
