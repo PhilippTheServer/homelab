@@ -279,7 +279,7 @@ KV v2 keeps full version history — every `put`/`patch` creates a new version, 
 vault kv get secret/ansible
 
 # Get a single field
-vault kv get -field=cloudflare_api_token secret/ansible
+vault kv get -field=namecheap_api_key secret/ansible
 
 # View a specific historical version
 vault kv get -version=2 secret/ansible
@@ -380,10 +380,11 @@ The `community.hashi_vault.hashi_vault` lookup plugin (from `ansible/requirement
 
 _hcv: "{{ lookup('community.hashi_vault.hashi_vault', 'secret/data/ansible') }}"
 
-vault_minipc_passwd:           "{{ _hcv.data.minipc_passwd }}"
-vault_cloudflare_api_token:    "{{ _hcv.data.cloudflare_api_token }}"
-vault_cloudflare_tunnel_token: "{{ _hcv.data.cloudflare_tunnel_token }}"
-vault_traefik_dashboard_auth:  "{{ _hcv.data.traefik_dashboard_auth }}"
+vault_minipc_passwd:              "{{ _hcv.data.minipc_passwd }}"
+vault_namecheap_api_user:         "{{ _hcv.data.namecheap_api_user }}"
+vault_namecheap_api_key:          "{{ _hcv.data.namecheap_api_key }}"
+vault_namecheap_ddns_password:    "{{ _hcv.data.namecheap_ddns_password }}"
+vault_traefik_dashboard_auth:     "{{ _hcv.data.traefik_dashboard_auth }}"
 vault_pihole_webpassword:      "{{ _hcv.data.pihole_webpassword }}"
 vault_keycloak_admin_user:     "{{ _hcv.data.keycloak_admin_user }}"
 vault_keycloak_admin_password: "{{ _hcv.data.keycloak_admin_password }}"

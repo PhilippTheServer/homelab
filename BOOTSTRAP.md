@@ -24,7 +24,7 @@ Infrastructure must be bootstrapped in dependency order. Priority reflects archi
 
 [priority 1]      keycloak   → SSO — must exist before any service is wired to it
 
-[priority 2]      headscale  → VPN — wire Keycloak OIDC, then Cloudflare Tunnel goes live
+[priority 2]      headscale  → VPN — wire Keycloak OIDC, then port forward goes live
 
 [priority 3]      vault      → HashiCorp Vault — secrets automation
 [priority 3]      vaultwarden → Password manager
@@ -45,7 +45,7 @@ ansible minipc -m ping -i ansible/inventory/hosts.yml --ask-vault-pass
 ansible-playbook ansible/site.yml -i ansible/inventory/hosts.yml \
   --tags common --ask-vault-pass
 
-# 2. Traefik (SSL prerequisite)
+# 2. Traefik (SSL + DDNS prerequisite)
 ansible-playbook ansible/site.yml -i ansible/inventory/hosts.yml \
   --tags traefik --ask-vault-pass
 
@@ -76,15 +76,27 @@ ansible-playbook ansible/site.yml -i ansible/inventory/hosts.yml \
 
 </details>
 
-### Post-bootstrap: Cloudflare zone settings (one-time, dashboard only)
+### Pre-bootstrap: Namecheap + FritzBox (one-time, before deploying Traefik)
 
-These cannot be managed via IaC — configure them once in the Cloudflare dashboard:
+#### Namecheap
 
-| Setting | Path | Value |
-|---|---|---|
-| **WebSockets** | philippthesurfer.com → Network → WebSockets | **On** |
+| Step | Where | Action |
+|------|-------|--------|
+| Enable DDNS | Domain List → Manage → Advanced DNS → Dynamic DNS | Toggle on, note the DDNS password |
+| Enable API | Profile → Tools → API Access | Enable, whitelist home IP (`curl -4 -s https://icanhazip.com`) |
+| Add A record | Domain List → Manage → Advanced DNS | Type: A, Host: `vpn`, Value: current home IP |
 
-WebSockets are required for Headscale's TS2021/Noise protocol. Without this, Tailscale clients from external networks cannot complete the coordination handshake.
+#### FritzBox
+
+Navigate to **http://fritz.box → Internet → Permit Access → Port Sharing**, target `192.168.178.20`:
+
+| Protocol | Port | Purpose |
+|----------|------|---------|
+| TCP | 443 | Traefik HTTPS / Headscale coordination |
+| TCP | 80 | Let's Encrypt HTTP fallback |
+| UDP | 3478 | STUN for Tailscale NAT traversal |
+
+FritzBox automatically creates both an IPv4 NAT rule and an IPv6 firewall allow rule from each port sharing entry.
 
 ### Post-bootstrap: wire SSO
 

@@ -4,7 +4,7 @@
 
 A home network built on a single mini PC running Debian 13 with Docker. All services are managed as Infrastructure as Code (Ansible + Docker Compose). Each service stack is fully self-contained with its own database — stacks can be developed, replaced, or torn down independently.
 
-**No public IP. No open ports. No services exposed to the internet.** Remote access is via Headscale VPN only. The sole public-facing endpoint is Headscale's control plane, tunneled through Cloudflare (no port forwarding required).
+**Three ports are open on the FritzBox** (TCP 443, TCP 80, UDP 3478), forwarded to the Mini PC. Everything else is LAN/VPN only. Remote access is via Headscale VPN; `vpn.philippthesurfer.com` is the sole public-facing endpoint, kept reachable via Namecheap DDNS.
 
 ---
 
@@ -13,15 +13,15 @@ A home network built on a single mini PC running Debian 13 with Docker. All serv
 ```mermaid
 graph TD
     INET(["🌐 Internet\nFiber Optic — 500 Mbit/s"])
-    CF["Cloudflare\nvpn.domain.com → Tunnel"]
+    NC["Namecheap DNS\nvpn.domain.com → home IP"]
 
     subgraph Router ["Fritz Box — 192.168.178.1"]
-        FB["Router + WiFi AP\nNAT · No open ports"]
+        FB["Router + WiFi AP\nNAT · Port forward: 443, 80, 3478 → .20"]
     end
 
     subgraph MiniPC ["Mini PC — 192.168.178.20 · Debian 13 · Docker · 16 GB RAM"]
-        Traefik["Traefik\nReverse Proxy · SSL\n(Cloudflare DNS challenge)"]
-        cloudflared["cloudflared\nOutbound tunnel only\n→ Cloudflare"]
+        Traefik["Traefik\nReverse Proxy · SSL\n(Namecheap DNS challenge)"]
+        ddclient["ddclient\nDDNS updater\n→ Namecheap"]
         PH["Pi-hole\nDNS + DHCP\nInternal DNS for *.home.domain"]
         KC["Keycloak\nSSO / OIDC\n+ Postgres"]
         HS["Headscale\nVPN control plane\n+ Postgres"]
@@ -45,9 +45,9 @@ graph TD
     INET <-->|"WAN"| FB
     FB <-->|"LAN / WiFi"| MiniPC
     FB <-->|"WiFi"| LAN
-    cloudflared -->|"outbound tunnel"| CF
-    CF -->|"vpn.domain.com"| cloudflared
-    cloudflared --> HS
+    ddclient -->|"DDNS update"| NC
+    NC -->|"vpn.domain.com → home IP"| INET
+    INET -->|"TCP 443"| FB
 
     C1 & C2 & C3 -->|"DNS"| PH
     PH -->|"upstream DNS"| INET
@@ -67,9 +67,9 @@ graph TD
 |---|---|---|
 | Local LAN | Direct (192.168.178.0/24) | All `*.home.philippthesurfer.com` services |
 | Remote (VPN) | Headscale mesh → Traefik | All `*.home.philippthesurfer.com` services |
-| Public internet | **Nothing** | Only `vpn.philippthesurfer.com` (Cloudflare Tunnel → Headscale control plane) |
+| Public internet | TCP 443 → FritzBox → Traefik → Headscale | Only `vpn.philippthesurfer.com` (Headscale control plane) |
 
-The Cloudflare Tunnel is outbound-only from the Mini PC. No inbound ports are opened on the Fritz Box. `*.home.philippthesurfer.com` records resolve to the Mini PC LAN IP via Pi-hole and are unreachable from outside the VPN.
+`*.home.philippthesurfer.com` records resolve to the Mini PC LAN IP via Pi-hole and are unreachable from outside the LAN or VPN. Traefik terminates TLS directly — no tunnel or third-party proxy sits between the client and the server.
 
 ---
 
@@ -77,10 +77,10 @@ The Cloudflare Tunnel is outbound-only from the Mini PC. No inbound ports are op
 
 Each stack is an independent Docker Compose file with its own database.
 
-### Traefik + cloudflared (Priority 2 — infrastructure)
-- **Role:** Reverse proxy for all internal services, wildcard SSL, Cloudflare Tunnel sidecar
-- **SSL:** Let's Encrypt wildcard cert via Cloudflare DNS API (works without public IP)
-- **Tunnel:** `cloudflared` container runs alongside Traefik, routes `vpn.philippthesurfer.com` → Headscale
+### Traefik + ddclient (Priority 2 — infrastructure)
+- **Role:** Reverse proxy for all internal services, wildcard SSL, DDNS updater sidecar
+- **SSL:** Let's Encrypt wildcard cert via Namecheap DNS API — DNS challenge allows issuing `*.home.philippthesurfer.com` without exposing internal domains publicly
+- **DDNS:** `ddclient` container runs alongside Traefik, updates the `vpn.philippthesurfer.com` A record every 5 minutes via Namecheap's DDNS service
 - **Compose:** `services/traefik/docker-compose.yml`
 - **Note:** Must be deployed before any HTTPS service, but after Keycloak is configured
 
@@ -93,7 +93,7 @@ Each stack is an independent Docker Compose file with its own database.
 
 ### Headscale (Priority 2 — remote access)
 - **Role:** Self-hosted Tailscale control plane, VPN mesh for remote access
-- **Public endpoint:** `vpn.philippthesurfer.com` — routed via Cloudflare Tunnel (not LAN-only)
+- **Public endpoint:** `vpn.philippthesurfer.com` — directly reachable via FritzBox port forward (TCP 443). TLS terminated by Traefik; WebSocket upgrade preserved end-to-end via HTTP/1.1 (`no-h2` TLS option).
 - **Auth:** OIDC via Keycloak
 - **Database:** Dedicated Postgres container in the same stack
 - **Compose:** `services/headscale/docker-compose.yml`
@@ -151,7 +151,7 @@ homelab/
 │   │   └── vault.yml         # ansible-vault encrypted secrets
 │   ├── roles/
 │   │   ├── common/           # Docker, UFW, deploy user
-│   │   ├── traefik/          # reverse proxy + SSL + cloudflared
+│   │   ├── traefik/          # reverse proxy + SSL + ddclient DDNS
 │   │   ├── keycloak/
 │   │   ├── headscale/
 │   │   ├── hcvault/
@@ -170,18 +170,20 @@ homelab/
 │   ├── gitlab/
 │   └── harbor/
 ├── README.md
-└── INFRASTRUCTURE.md
+├── INFRASTRUCTURE.md
+├── DDNS.md
+└── BOOTSTRAP.md
 ```
 
 ### Bootstrap Order
 ```
 common      → Docker, UFW, system users
-traefik     → SSL + Cloudflare Tunnel (infrastructure prerequisite)
+traefik     → SSL + DDNS (infrastructure prerequisite)
 keycloak    → SSO (configure realm + OIDC clients before continuing)
 headscale   → VPN (remote access live after this step)
 hcvault     → secrets automation + store Vault unseal keys in Vaultwarden
 vaultwarden → password manager
-pihole      → DNS + DHCP (migrate existing Pi-hole here)
+pihole      → DNS + DHCP
 gitlab      → push this repo to GitLab; CI takes over re-deploys
 harbor      → registry
 ```
@@ -197,11 +199,18 @@ Pi-hole → resolves *.home.philippthesurfer.com → Mini PC LAN IP
 Device → Traefik :443 → routes by hostname → service container
 ```
 
-### Remote access (VPN)
+### Remote Headscale registration (new device)
 ```
-Remote device → vpn.philippthesurfer.com (Cloudflare Tunnel) → cloudflared → Headscale
-Headscale → establishes mesh VPN → device acts as if on LAN
-Device → *.home.philippthesurfer.com → Traefik → service
+Remote device → vpn.philippthesurfer.com
+Namecheap DNS → resolves to home IP
+FritzBox → port forwards TCP 443 → Traefik → headscale:8080
+Headscale → device registered into VPN mesh
+```
+
+### Remote access (after VPN connected)
+```
+Remote device (Headscale VPN) → *.home.philippthesurfer.com
+Pi-hole DNS → Mini PC LAN IP → Traefik → service
 ```
 
 ### CI/CD pipeline
@@ -219,7 +228,7 @@ User → service → redirect to auth.home.philippthesurfer.com (Keycloak) → a
 
 ## Open Questions / To Clarify
 
-- Mini PC exact IP address (fill in `192.168.178.20`)
 - Fritz Box DHCP: fully disabled in favour of Pi-hole, or running alongside?
 - HashiCorp Vault auto-unseal strategy (cloud KMS vs. manual) — needed after any reboot
 - GitLab Runner concurrent build limit (default: 1, increase carefully given 16 GB RAM)
+- IPv6: ISP provides native IPv6 but Namecheap DDNS only updates A records; AAAA record requires Namecheap API — not yet configured

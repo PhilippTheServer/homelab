@@ -11,15 +11,13 @@ For the full network diagram and architecture decisions, see [INFRASTRUCTURE.md]
 **Requirements**
 - ansible
 - ansible-galaxy (for community playbooks)
-- Namecheap (domain)
-- Cloudflare [API Token] (free account for tunel)
-- ssh key to target system
-
+- Namecheap domain with DDNS enabled and API access
+- SSH key to target system
 
 To generate all passwords use:
 
 ```sh
-# Strong random password (use for any "CHOOSE_A_PASSWORD" above)
+# Strong random password (use for any "CHOOSE_A_PASSWORD" below)
 openssl rand -base64 32
 
 # Vaultwarden admin token
@@ -32,20 +30,16 @@ openssl rand -hex 8
 htpasswd -nB philipp
 ```
 
-Create a Cloudflare API Token. Paste into the vault file.
-
-
-
 ---
 
 ## Access Model
 
-**There is no public IP and no open ports on the Fritz Box.** Services are accessible in two ways only:
+**Remote access uses open ports — TCP 443, TCP 80, and UDP 3478 are forwarded on the FritzBox to the Mini PC.** Services are accessible in two ways:
 
 - **On the local network** — `*.home.philippthesurfer.com` resolves via Pi-hole to the Mini PC's LAN IP
 - **Remotely via VPN** — Headscale (self-hosted Tailscale) provides a private mesh network
 
-The only exception is Headscale's own control plane, which must be reachable from the internet for VPN device registration. This is handled via a **Cloudflare Tunnel** — a single outbound `cloudflared` container creates a tunnel to Cloudflare's edge, routing `vpn.philippthesurfer.com` → Headscale. No ports are opened. Nothing else is tunneled.
+Headscale's control plane is reachable from the internet via `vpn.philippthesurfer.com`, which is a public DNS A record kept current by ddclient (Namecheap DDNS). Traefik terminates TLS directly — no tunnel or third-party proxy sits in front of it.
 
 **Keycloak, Bitwarden, and all other services are never reachable from the public internet.**
 
@@ -58,8 +52,8 @@ Services are listed in setup priority order — the order in which they should b
 | Priority | Service | Role | URL |
 |---|---|---|---|
 | 1 | **Keycloak** | SSO / OIDC identity provider — all services authenticate here | `auth.home.philippthesurfer.com` |
-| 2 | **Traefik** | Reverse proxy, wildcard SSL (Let's Encrypt via Cloudflare DNS) | `traefik.home.philippthesurfer.com` |
-| 2 | **Headscale** | Self-hosted Tailscale VPN control plane | `vpn.philippthesurfer.com` (public, via Cloudflare Tunnel) |
+| 2 | **Traefik** | Reverse proxy, wildcard SSL (Let's Encrypt via Namecheap DNS) | `traefik.home.philippthesurfer.com` |
+| 2 | **Headscale** | Self-hosted Tailscale VPN control plane | `vpn.philippthesurfer.com` (public, direct via DDNS) |
 | 3 | **HashiCorp Vault** | Secrets management, dynamic credentials for automation | `vault.home.philippthesurfer.com` |
 | 3 | **Vaultwarden** | Self-hosted Bitwarden-compatible password manager | `bw.home.philippthesurfer.com` |
 | 4 | **Pi-hole** | DNS + DHCP, ad/tracker blocking, internal DNS resolution | `pihole.home.philippthesurfer.com` |
@@ -70,21 +64,19 @@ All services sit behind Traefik with a wildcard Let's Encrypt cert (`*.home.phil
 
 ---
 
-## DNS Setup (Cloudflare Required)
+## DNS & External Access
 
-Cloudflare is required — for two reasons:
+The domain is registered at Namecheap. Two Namecheap features are used:
 
-1. **Cloudflare Tunnel** is how Headscale is reachable from the internet without a public IP
-2. **Cloudflare DNS challenge** is how Traefik gets Let's Encrypt certs without exposing any port
+1. **DDNS** — ddclient keeps the A record for `vpn.philippthesurfer.com` pointing at the current home IP, updated every 5 minutes
+2. **DNS challenge** — Traefik uses the Namecheap API to issue wildcard Let's Encrypt certs (`*.home.philippthesurfer.com`) without requiring those internal domains to be publicly reachable
 
-**Steps:**
-1. Keep your domain registered at Namecheap
-2. Create a free Cloudflare account and add your domain
-3. Namecheap → Domain settings → change nameservers to Cloudflare's nameservers
-4. In Cloudflare: create an API token with `Zone:DNS:Edit` permission (used by Traefik)
-5. In Cloudflare: create a Tunnel for Headscale (Cloudflare Zero Trust → Tunnels → Create tunnel)
-   - Route: `vpn.philippthesurfer.com` → `http://headscale:8080` (internal container hostname)
-   - Copy the tunnel token — goes into Ansible Vault
+See [DDNS.md](DDNS.md) for full setup and troubleshooting details.
+
+**Steps to configure Namecheap before running Ansible:**
+1. Domain List → Manage → Advanced DNS → enable **Dynamic DNS** (note the DDNS password)
+2. Profile → Tools → API Access → enable API and whitelist your home IP (`curl -4 -s https://icanhazip.com`)
+3. Advanced DNS → add A record: `vpn` → current home IP (ddclient will keep it updated)
 
 Internal service DNS (`*.home.philippthesurfer.com`) is handled by Pi-hole pointing to the Mini PC LAN IP. These records never leave your network.
 
@@ -130,12 +122,21 @@ chmod 700 /home/deploy/.ssh && chmod 600 /home/deploy/.ssh/authorized_keys
 chown -R deploy:deploy /home/deploy/.ssh
 ```
 
-On **Cloudflare** (before running Ansible):
+On **Namecheap** (before running Ansible):
 
-1. Domain added to Cloudflare with nameservers updated at Namecheap
-2. API token created: `Zone:DNS:Edit` for your domain
-3. Cloudflare Tunnel created for Headscale — tunnel token copied
-4. DNS record added: `vpn.philippthesurfer.com` → tunnel (Cloudflare sets this automatically when creating the tunnel)
+1. DDNS enabled for the domain — DDNS password noted
+2. API access enabled — home IP whitelisted
+3. A record `vpn.philippthesurfer.com` created
+
+On **FritzBox** (before deploying Traefik):
+
+Navigate to **http://fritz.box → Internet → Permit Access → Port Sharing**, target `192.168.178.20`:
+
+| Protocol | Port | Purpose |
+|----------|------|---------|
+| TCP | 443 | Traefik HTTPS / Headscale |
+| TCP | 80 | Let's Encrypt HTTP fallback |
+| UDP | 3478 | STUN for Tailscale NAT traversal |
 
 ---
 
@@ -147,8 +148,7 @@ Edit [ansible/inventory/hosts.yml](ansible/inventory/hosts.yml) to set target de
 
 ### 2. Set non-secret variables
 
-Edit [ansible/group_vars/all/vars.yml](ansible/group_vars/all/vars.yml) to change versions or other chore variables.
-
+Edit [ansible/group_vars/all/vars.yml](ansible/group_vars/all/vars.yml) to change versions or other config variables.
 
 ### 3. Populate secrets in HashiCorp Vault
 
@@ -164,8 +164,9 @@ Then store all secrets (run from your Mac after `vault login -method=oidc`):
 
 ```bash
 vault kv put secret/ansible \
-  cloudflare_api_token="..." \
-  cloudflare_tunnel_token="..." \
+  namecheap_api_user="..." \
+  namecheap_api_key="..." \
+  namecheap_ddns_password="..." \
   traefik_dashboard_auth="..." \
   pihole_webpassword="..." \
   keycloak_admin_user="admin" \
@@ -203,11 +204,8 @@ openssl rand -hex 8
 # Traefik dashboard auth (needs apache2-utils)
 htpasswd -nB philipp
 
-# Cloudflare API Token: dashboard → My Profile → API Tokens → Create Token
-# Permission: Zone:DNS:Edit for philippthesurfer.com
-
-# Cloudflare Tunnel token: Zero Trust → Networks → Tunnels → your tunnel → Configure
-
+# Namecheap API key: Profile → Tools → API Access
+# Namecheap DDNS password: Domain List → Manage → Advanced DNS → Dynamic DNS
 # OIDC secrets: filled in after Keycloak is running — copy from Keycloak client credentials
 ```
 
@@ -242,7 +240,7 @@ homelab/
 │   │   └── vault.yml              # hashi_vault lookups — secrets live in HCP Vault
 │   ├── roles/
 │   │   ├── common/                # Docker, UFW, deploy user
-│   │   ├── traefik/               # reverse proxy + SSL + cloudflared tunnel
+│   │   ├── traefik/               # reverse proxy + SSL + ddclient DDNS
 │   │   ├── keycloak/              # SSO
 │   │   ├── headscale/             # VPN
 │   │   ├── hcvault/               # HashiCorp Vault
@@ -252,7 +250,7 @@ homelab/
 │   │   └── harbor/                # Docker registry
 │   └── site.yml                   # master playbook
 ├── services/
-│   ├── traefik/                   # includes cloudflared sidecar
+│   ├── traefik/                   # includes ddclient DDNS sidecar
 │   ├── keycloak/
 │   ├── headscale/
 │   ├── hcvault/
@@ -262,6 +260,7 @@ homelab/
 │   └── harbor/
 ├── README.md
 ├── INFRASTRUCTURE.md              # network diagram + architecture decisions
+├── DDNS.md                        # DDNS setup, Namecheap config, cert issuance
 ├── HASHICORPVAULT.md              # Vault CLI setup, SSH certs, secret management, Ansible integration
 └── BOOTSTRAP.md                   # step-by-step first-deploy guide
 ```
@@ -278,14 +277,15 @@ homelab/
 - Check Traefik dashboard (`traefik.home.philippthesurfer.com`) — verify the router is registered
 
 **Let's Encrypt cert not issuing**
-- Check Traefik logs: `docker compose -f /opt/homelab/services/traefik/docker-compose.yml logs`
-- Verify `vault_cloudflare_api_token` in Ansible Vault is correct and has `Zone:DNS:Edit` permission
+- Check Traefik logs: `docker compose -f /opt/homelab/services/traefik/docker-compose.yml logs traefik`
+- Verify `vault_namecheap_api_key` is correct and the home IP is whitelisted in Namecheap API settings
 - Set `letsencrypt_staging: true` and re-deploy to test without hitting rate limits
 
 **Headscale devices can't connect remotely**
-- Check Cloudflare Tunnel status: Cloudflare Zero Trust dashboard → Tunnels
-- Check `cloudflared` container logs in the traefik stack
-- Verify `vpn.philippthesurfer.com` resolves to Cloudflare (not your LAN IP)
+- Check ddclient logs: `docker logs ddclient` — confirm A record is current
+- Verify `vpn.philippthesurfer.com` resolves to your home IP: `dig vpn.philippthesurfer.com +short`
+- Check FritzBox port forwarding is set up: TCP 443 → 192.168.178.20
+- See [DDNS.md](DDNS.md) for the full diagnostic checklist
 
 **Keycloak OIDC login failing**
 - Verify the redirect URI in the Keycloak client matches the service URL exactly
