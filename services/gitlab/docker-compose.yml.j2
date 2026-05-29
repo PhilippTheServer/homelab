@@ -25,8 +25,14 @@ services:
         # Disable built-in Let's Encrypt (Traefik handles certs)
         letsencrypt['enable'] = false
 
-        # GitLab Runner registration token (retrieve after first boot via UI)
-        # gitlab_rails['initial_shared_runners_registration_token'] = '...'
+        # Disable public registration — SSO only
+        gitlab_rails['gitlab_signup_enabled'] = false
+
+        # No SMTP configured — suppress email delivery errors
+        gitlab_rails['gitlab_email_enabled'] = false
+
+        # SSH git access (host port 2222 → container port 22)
+        gitlab_rails['gitlab_shell_ssh_port'] = 2222
 
         # Keycloak OIDC SSO
         gitlab_rails['omniauth_enabled'] = true
@@ -34,6 +40,7 @@ services:
         gitlab_rails['omniauth_sync_email_from_provider'] = 'openid_connect'
         gitlab_rails['omniauth_auto_link_user'] = ['openid_connect']
         gitlab_rails['omniauth_block_auto_created_users'] = false
+        gitlab_rails['omniauth_auto_sign_in_with_provider'] = 'openid_connect'
         gitlab_rails['omniauth_providers'] = [
           {
             'name' => 'openid_connect',
@@ -64,6 +71,8 @@ services:
         puma['max_threads'] = 4
         sidekiq['concurrency'] = 5
         prometheus_monitoring['enable'] = false
+    ports:
+      - "2222:22"
     volumes:
       - gitlab_config:/etc/gitlab
       - gitlab_logs:/var/log/gitlab

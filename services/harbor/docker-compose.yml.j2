@@ -1,0 +1,218 @@
+---
+# Harbor container registry — all components as a single compose stack
+# Traefik handles TLS; the Harbor proxy (nginx) listens on HTTP port 8080
+
+networks:
+  harbor:
+    driver: bridge
+  proxy:
+    external: true
+
+volumes:
+  harbor_db_data:
+    name: harbor_db_data
+  harbor_registry_data:
+    name: harbor_registry_data
+  harbor_redis_data:
+    name: harbor_redis_data
+  harbor_job_logs:
+    name: harbor_job_logs
+  harbor_core_data:
+    name: harbor_core_data
+
+services:
+
+  harbor-db:
+    image: goharbor/harbor-db:{{ harbor_version }}
+    container_name: harbor-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: "{{ vault_harbor_db_password }}"
+    volumes:
+      - harbor_db_data:/var/lib/postgresql/data
+    networks:
+      harbor:
+        aliases:
+          - harbor-db
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: goharbor/redis-photon:{{ harbor_version }}
+    container_name: harbor-redis
+    restart: unless-stopped
+    volumes:
+      - harbor_redis_data:/var/lib/redis
+    networks:
+      harbor:
+        aliases:
+          - redis
+
+  registry:
+    image: goharbor/registry-photon:{{ harbor_version }}
+    container_name: harbor-registry
+    restart: unless-stopped
+    depends_on:
+      harbor-db:
+        condition: service_healthy
+    volumes:
+      - harbor_registry_data:/storage
+      - {{ homelab_base_dir }}/services/harbor/config/registry.yml:/etc/registry/config.yml:ro
+      - {{ homelab_base_dir }}/services/harbor/secrets/root.crt:/etc/registry/root.crt:ro
+    networks:
+      harbor:
+        aliases:
+          - registry
+
+  registryctl:
+    image: goharbor/harbor-registryctl:{{ harbor_version }}
+    container_name: harbor-registryctl
+    restart: unless-stopped
+    environment:
+      CORE_SECRET: "{{ vault_harbor_core_secret }}"
+      JOBSERVICE_SECRET: "{{ vault_harbor_jobservice_secret }}"
+      REGISTRY_HTTP_SECRET: "{{ vault_harbor_registry_http_secret }}"
+      LOG_LEVEL: info
+    volumes:
+      - harbor_registry_data:/storage
+      - {{ homelab_base_dir }}/services/harbor/config/registry.yml:/etc/registry/config.yml:ro
+    networks:
+      harbor:
+        aliases:
+          - registryctl
+
+  harbor-core:
+    image: goharbor/harbor-core:{{ harbor_version }}
+    container_name: harbor-core
+    restart: unless-stopped
+    depends_on:
+      harbor-db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      registry:
+        condition: service_started
+    environment:
+      CORE_SECRET: "{{ vault_harbor_core_secret }}"
+      JOBSERVICE_SECRET: "{{ vault_harbor_jobservice_secret }}"
+      HARBOR_ADMIN_PASSWORD: "{{ vault_harbor_admin_password }}"
+      DATABASE_HOST: harbor-db
+      DATABASE_PORT: "5432"
+      DATABASE_DB: registry
+      DATABASE_USERNAME: postgres
+      DATABASE_PASSWORD: "{{ vault_harbor_db_password }}"
+      DATABASE_MAX_IDLE_CONNS: "100"
+      DATABASE_MAX_OPEN_CONNS: "900"
+      DATABASE_CONN_MAX_LIFETIME: "300"
+      DATABASE_CONN_MAX_IDLE_TIME: "0"
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: ""
+      REDIS_DB_INDEX: "0"
+      EXT_ENDPOINT: "https://registry.{{ internal_subdomain }}.{{ domain }}"
+      CORE_URL: "http://harbor-core:8080"
+      TOKEN_SERVICE_URL: "http://harbor-core:8080/service/token"
+      REGISTRY_URL: "http://registry:5000"
+      REGISTRY_CONTROLLER_URL: "http://registryctl:8080"
+      PORTAL_URL: "http://portal:8080"
+      JOBSERVICE_URL: "http://jobservice:8080"
+      WITH_TRIVY: "true"
+      TRIVY_ADAPTER_URL: "http://trivy-adapter:8080"
+      CSRF_KEY: "{{ vault_harbor_csrf_key }}"
+      CONFIG_PATH: /etc/core/app.conf
+      LOG_LEVEL: info
+      SYNC_REGISTRY: "false"
+      METRIC_ENABLE: "false"
+      TRACE_ENABLED: "false"
+      NOTIFICATION_WEBHOOK_JOB_MAX_RETRY: "3"
+      NOTIFICATION_WEBHOOK_JOB_HTTP_CLIENT_TIMEOUT: "3"
+      AUDIT_LOG_FORWARD_ENDPOINT: ""
+      SKIP_AUDIT_LOG_DATABASE: "false"
+    volumes:
+      - {{ homelab_base_dir }}/services/harbor/config/core-app.conf:/etc/core/app.conf:ro
+      - {{ homelab_base_dir }}/services/harbor/secrets/private_key.pem:/etc/core/private_key.pem:ro
+      - {{ homelab_base_dir }}/services/harbor/secrets/secretkey:/etc/core/key:ro
+      - harbor_core_data:/data
+    networks:
+      harbor:
+        aliases:
+          - harbor-core
+
+  harbor-portal:
+    image: goharbor/harbor-portal:{{ harbor_version }}
+    container_name: harbor-portal
+    restart: unless-stopped
+    depends_on:
+      - harbor-core
+    networks:
+      harbor:
+        aliases:
+          - portal
+
+  jobservice:
+    image: goharbor/harbor-jobservice:{{ harbor_version }}
+    container_name: harbor-jobservice
+    restart: unless-stopped
+    depends_on:
+      - harbor-core
+    environment:
+      CORE_SECRET: "{{ vault_harbor_core_secret }}"
+      JOBSERVICE_SECRET: "{{ vault_harbor_jobservice_secret }}"
+      CORE_URL: "http://harbor-core:8080"
+      LOG_LEVEL: info
+    volumes:
+      - harbor_job_logs:/var/log/jobs
+      - {{ homelab_base_dir }}/services/harbor/config/jobservice.yml:/etc/jobservice/config.yml:ro
+    networks:
+      harbor:
+        aliases:
+          - jobservice
+
+  trivy-adapter:
+    image: goharbor/trivy-adapter-photon:{{ harbor_version }}
+    container_name: harbor-trivy
+    restart: unless-stopped
+    depends_on:
+      - redis
+    environment:
+      SCANNER_LOG_LEVEL: info
+      SCANNER_TRIVY_CACHE_DIR: /home/scanner/.cache/trivy
+      SCANNER_TRIVY_REPORTS_DIR: /home/scanner/.cache/reports
+      SCANNER_TRIVY_DEBUG_MODE: "false"
+      SCANNER_TRIVY_VULN_TYPE: os,library
+      SCANNER_TRIVY_SEVERITY: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+      SCANNER_TRIVY_IGNORE_UNFIXED: "false"
+      SCANNER_TRIVY_SKIP_UPDATE: "false"
+      SCANNER_TRIVY_OFFLINE_SCAN: "false"
+      SCANNER_TRIVY_SECURITY_CHECKS: vuln
+      SCANNER_TRIVY_INSECURE: "false"
+      SCANNER_STORE_REDIS_URL: "redis://redis:6379/5"
+      SCANNER_JOB_QUEUE_REDIS_URL: "redis://redis:6379/5"
+    networks:
+      harbor:
+        aliases:
+          - trivy-adapter
+
+  proxy:
+    image: goharbor/nginx-photon:{{ harbor_version }}
+    container_name: harbor-proxy
+    restart: unless-stopped
+    depends_on:
+      - harbor-core
+      - harbor-portal
+      - registry
+    volumes:
+      - {{ homelab_base_dir }}/services/harbor/config/nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - harbor
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.harbor.rule=Host(`registry.{{ internal_subdomain }}.{{ domain }}`)"
+      - "traefik.http.routers.harbor.entrypoints=websecure"
+      - "traefik.http.routers.harbor.tls.certresolver=letsencrypt"
+      - "traefik.http.services.harbor.loadbalancer.server.port=8080"
+      - "traefik.docker.network=proxy"

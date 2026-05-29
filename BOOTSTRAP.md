@@ -118,6 +118,30 @@ After Keycloak is running, create OIDC clients for each service before deploying
    ```
 4. Re-run the affected roles to apply SSO config
 
+### Pre-deploy: Harbor internal secrets (one-time, before first Harbor deploy)
+
+Harbor requires several internal secrets in addition to its OIDC secret. Generate them all at once:
+
+```bash
+vault kv patch secret/ansible \
+  harbor_admin_password="$(openssl rand -base64 24)" \
+  harbor_db_password="$(openssl rand -base64 24)" \
+  harbor_core_secret="$(openssl rand -base64 32)" \
+  harbor_jobservice_secret="$(openssl rand -base64 32)" \
+  harbor_csrf_key="$(openssl rand -hex 16)" \
+  harbor_registry_http_secret="$(openssl rand -base64 32)"
+```
+
+| Secret | Purpose |
+|---|---|
+| `harbor_admin_password` | Initial local admin password |
+| `harbor_db_password` | PostgreSQL password for harbor-db |
+| `harbor_core_secret` | Shared HMAC secret between harbor-core, registryctl, and jobservice |
+| `harbor_jobservice_secret` | Authentication secret for jobservice → core callbacks |
+| `harbor_csrf_key` | 32-char key for CSRF token signing in harbor-core (Beego) |
+| `harbor_registry_http_secret` | HTTP secret shared between the OCI registry and registryctl |
+| `harbor_oidc_secret` | Keycloak client secret (set during SSO wiring above) |
+
 ### Post-bootstrap: initialize HashiCorp Vault
 
 HashiCorp Vault requires a one-time init after first deploy:

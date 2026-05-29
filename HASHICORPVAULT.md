@@ -375,8 +375,8 @@ The `community.hashi_vault.hashi_vault` lookup plugin (from `ansible/requirement
 ```yaml
 _vault_secrets: "{{ lookup('community.hashi_vault.hashi_vault', 'secret/data/ansible') }}"
 
-vault_minipc_passwd:            "{{ _vault_secrets.data.minipc_passwd }}"
-vault_namecheap_api_user:       "{{ _vault_secrets.data.namecheap_api_user }}"
+vault_minipc_passwd:            "{{ _vault_secrets.minipc_passwd }}"
+vault_namecheap_api_user:       "{{ _vault_secrets.namecheap_api_user }}"
 # ... (full list in vars.yml)
 ```
 
@@ -455,7 +455,7 @@ vault kv patch secret/ansible ntfy_admin_password="$(openssl rand -base64 32)"
 
 ```yaml
 # ansible/group_vars/all/vars.yml — add one line to the secrets block:
-vault_ntfy_admin_password: "{{ _vault_secrets.data.ntfy_admin_password }}"
+vault_ntfy_admin_password: "{{ _vault_secrets.ntfy_admin_password }}"
 ```
 
 **3. Reference it in your Jinja2 template**

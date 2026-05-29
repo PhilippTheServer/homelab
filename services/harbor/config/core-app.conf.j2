@@ -1,0 +1,7 @@
+appname = Harbor
+runmode = prod
+enablexsrf = true
+xsrfkey = {{ vault_harbor_csrf_key }}
+xsrfexpire = 3600
+[prod]
+httpport = 8080

@@ -1,0 +1,39 @@
+version: 0.1
+log:
+  accesslog:
+    disabled: true
+  level: info
+  formatter: text
+  fields:
+    service: registry
+    environment: production
+storage:
+  filesystem:
+    rootdirectory: /storage
+  maintenance:
+    uploadpurging:
+      enabled: false
+  cache:
+    layerinfo: inmemory
+  delete:
+    enabled: true
+  redirect:
+    disable: true
+http:
+  addr: :5000
+  relativeurls: false
+  secret: "{{ vault_harbor_registry_http_secret }}"
+  draintimeout: 60s
+  headers:
+    X-Content-Type-Options: [nosniff]
+auth:
+  token:
+    issuer: harbor-token-issuer
+    realm: https://registry.{{ internal_subdomain }}.{{ domain }}/service/token
+    rootcertbundle: /etc/registry/root.crt
+    service: harbor-registry
+validation:
+  manifests:
+    urls:
+      allow:
+        - ^https?://

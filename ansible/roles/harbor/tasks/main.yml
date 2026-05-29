@@ -1,53 +1,85 @@
 ---
-- name: Create harbor directory
+- name: Create harbor directories
   file:
-    path: "{{ homelab_base_dir }}/services/harbor"
+    path: "{{ item }}"
     state: directory
     owner: "{{ deploy_user }}"
     group: "{{ deploy_user }}"
     mode: '0750'
+  loop:
+    - "{{ homelab_base_dir }}/services/harbor"
+    - "{{ homelab_base_dir }}/services/harbor/config"
+    - "{{ homelab_base_dir }}/services/harbor/secrets"
 
-- name: Check if Harbor installer is already extracted
-  stat:
-    path: "{{ homelab_base_dir }}/services/harbor/install.sh"
-  register: harbor_installer
+- name: Set secrets directory to root-only (private key lives here)
+  file:
+    path: "{{ homelab_base_dir }}/services/harbor/secrets"
+    mode: '0700'
 
-- name: Download Harbor offline installer
-  get_url:
-    url: "https://github.com/goharbor/harbor/releases/download/{{ harbor_version }}/harbor-offline-installer-{{ harbor_version }}.tgz"
-    dest: "/tmp/harbor-installer-{{ harbor_version }}.tgz"
-    mode: '0644'
-  when: not harbor_installer.stat.exists
+- name: Generate Harbor core JWT private key (one-time)
+  command:
+    cmd: >
+      openssl genrsa
+      -out {{ homelab_base_dir }}/services/harbor/secrets/private_key.pem
+      4096
+    creates: "{{ homelab_base_dir }}/services/harbor/secrets/private_key.pem"
 
-- name: Extract Harbor installer
-  unarchive:
-    src: "/tmp/harbor-installer-{{ harbor_version }}.tgz"
-    dest: "{{ homelab_base_dir }}/services/"
-    remote_src: true
-    extra_opts: [--strip-components=1]
-    owner: "{{ deploy_user }}"
-    group: "{{ deploy_user }}"
-  when: not harbor_installer.stat.exists
+- name: Generate Harbor registry root cert from private key (one-time)
+  command:
+    cmd: >
+      openssl req -new -x509
+      -key {{ homelab_base_dir }}/services/harbor/secrets/private_key.pem
+      -out {{ homelab_base_dir }}/services/harbor/secrets/root.crt
+      -days 3650
+      -subj "/CN=harbor-token-issuer"
+    creates: "{{ homelab_base_dir }}/services/harbor/secrets/root.crt"
 
-- name: Render harbor.yml
+- name: Generate Harbor AES secret key (one-time, must be 16 bytes)
+  shell:
+    cmd: openssl rand -hex 8 | tr -d '\n' > {{ homelab_base_dir }}/services/harbor/secrets/secretkey
+  args:
+    creates: "{{ homelab_base_dir }}/services/harbor/secrets/secretkey"
+
+- name: Render nginx.conf
   template:
-    src: "{{ playbook_dir }}/../services/harbor/harbor.yml.j2"
-    dest: "{{ homelab_base_dir }}/services/harbor/harbor.yml"
+    src: "{{ playbook_dir }}/../services/harbor/config/nginx.conf.j2"
+    dest: "{{ homelab_base_dir }}/services/harbor/config/nginx.conf"
     owner: "{{ deploy_user }}"
     group: "{{ deploy_user }}"
     mode: '0640'
-  register: harbor_config
+  notify: restart harbor
 
-- name: Run Harbor prepare script
-  command:
-    cmd: ./prepare
-    chdir: "{{ homelab_base_dir }}/services/harbor"
-  when: harbor_config.changed
-
-- name: Render docker-compose.override.yml (Traefik integration)
+- name: Render registry.yml
   template:
-    src: "{{ playbook_dir }}/../services/harbor/docker-compose.override.yml.j2"
-    dest: "{{ homelab_base_dir }}/services/harbor/docker-compose.override.yml"
+    src: "{{ playbook_dir }}/../services/harbor/config/registry.yml.j2"
+    dest: "{{ homelab_base_dir }}/services/harbor/config/registry.yml"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: '0640'
+  notify: restart harbor
+
+- name: Render jobservice.yml
+  template:
+    src: "{{ playbook_dir }}/../services/harbor/config/jobservice.yml.j2"
+    dest: "{{ homelab_base_dir }}/services/harbor/config/jobservice.yml"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: '0640'
+  notify: restart harbor
+
+- name: Render core app.conf
+  template:
+    src: "{{ playbook_dir }}/../services/harbor/config/core-app.conf.j2"
+    dest: "{{ homelab_base_dir }}/services/harbor/config/core-app.conf"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: '0640'
+  notify: restart harbor
+
+- name: Render docker-compose.yml
+  template:
+    src: "{{ playbook_dir }}/../services/harbor/docker-compose.yml.j2"
+    dest: "{{ homelab_base_dir }}/services/harbor/docker-compose.yml"
     owner: "{{ deploy_user }}"
     group: "{{ deploy_user }}"
     mode: '0640'
@@ -59,3 +91,43 @@
     chdir: "{{ homelab_base_dir }}/services/harbor"
   become_user: "{{ deploy_user }}"
   changed_when: false
+
+- name: Wait for Harbor API to be ready
+  uri:
+    url: "http://localhost:8080/api/v2.0/systeminfo"
+    status_code: 200
+  register: _harbor_ready
+  retries: 30
+  delay: 10
+  until: _harbor_ready.status == 200
+
+- name: Get current Harbor auth configuration
+  uri:
+    url: "http://localhost:8080/api/v2.0/configurations"
+    method: GET
+    user: admin
+    password: "{{ vault_harbor_admin_password }}"
+    force_basic_auth: true
+  register: _harbor_cfg
+
+- name: Configure Harbor OIDC (Keycloak)
+  uri:
+    url: "http://localhost:8080/api/v2.0/configurations"
+    method: PUT
+    user: admin
+    password: "{{ vault_harbor_admin_password }}"
+    force_basic_auth: true
+    body_format: json
+    body:
+      auth_mode: "oidc_auth"
+      oidc_name: "Keycloak"
+      oidc_endpoint: "https://auth.{{ domain }}/realms/homelab"
+      oidc_client_id: "harbor"
+      oidc_client_secret: "{{ vault_harbor_oidc_secret }}"
+      oidc_scope: "openid,profile,email,groups"
+      oidc_verify_cert: true
+      oidc_auto_onboard: true
+      oidc_user_claim: "preferred_username"
+      oidc_groups_claim: "groups"
+    status_code: 200
+  when: _harbor_cfg.json.auth_mode.value != 'oidc_auth'
