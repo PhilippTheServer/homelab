@@ -1,4 +1,4 @@
-# Ansible Vault password file — never commit this
+# Ansible Vault password files (no longer used — secrets are in HashiCorp Vault)
 .vault_pass
 .vault_password
 *.vault_pass

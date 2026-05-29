@@ -1,0 +1,72 @@
+---
+- name: Create homepage directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: '0750'
+  loop:
+    - "{{ homelab_base_dir }}/services/homepage"
+    - "{{ homelab_base_dir }}/services/homepage/config"
+
+- name: Render settings.yaml
+  template:
+    src: "{{ playbook_dir }}/../services/homepage/config/settings.yaml.j2"
+    dest: "{{ homelab_base_dir }}/services/homepage/config/settings.yaml"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: '0640'
+  notify: restart homepage
+
+- name: Render services.yaml
+  template:
+    src: "{{ playbook_dir }}/../services/homepage/config/services.yaml.j2"
+    dest: "{{ homelab_base_dir }}/services/homepage/config/services.yaml"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: '0640'
+  notify: restart homepage
+
+- name: Render widgets.yaml
+  template:
+    src: "{{ playbook_dir }}/../services/homepage/config/widgets.yaml.j2"
+    dest: "{{ homelab_base_dir }}/services/homepage/config/widgets.yaml"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: '0640'
+  notify: restart homepage
+
+- name: Render bookmarks.yaml
+  template:
+    src: "{{ playbook_dir }}/../services/homepage/config/bookmarks.yaml.j2"
+    dest: "{{ homelab_base_dir }}/services/homepage/config/bookmarks.yaml"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: '0640'
+  notify: restart homepage
+
+- name: Render docker.yaml
+  template:
+    src: "{{ playbook_dir }}/../services/homepage/config/docker.yaml.j2"
+    dest: "{{ homelab_base_dir }}/services/homepage/config/docker.yaml"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: '0640'
+  notify: restart homepage
+
+- name: Render docker-compose.yml
+  template:
+    src: "{{ playbook_dir }}/../services/homepage/docker-compose.yml.j2"
+    dest: "{{ homelab_base_dir }}/services/homepage/docker-compose.yml"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: '0640'
+  notify: restart homepage
+
+- name: Ensure homepage stack is running
+  command:
+    cmd: docker compose up -d --remove-orphans
+    chdir: "{{ homelab_base_dir }}/services/homepage"
+  become_user: "{{ deploy_user }}"
+  changed_when: false

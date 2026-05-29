@@ -1,0 +1,6 @@
+---
+- name: restart homepage
+  command:
+    cmd: docker compose restart homepage
+    chdir: "{{ homelab_base_dir }}/services/homepage"
+  become_user: "{{ deploy_user }}"

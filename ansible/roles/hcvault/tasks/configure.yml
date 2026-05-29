@@ -13,7 +13,7 @@
 - name: Enable KV v2 secrets engine at secret/
   shell: >
     docker exec
-    -e VAULT_TOKEN="{{ vault_hcvault_root_token }}"
+    -e VAULT_TOKEN="{{ lookup('env', 'VAULT_TOKEN') }}"
     vault vault secrets enable -version=2 -path=secret kv
   register: r
   changed_when: "'Successfully enabled' in r.stdout"
@@ -22,7 +22,7 @@
 - name: Enable OIDC auth method
   shell: >
     docker exec
-    -e VAULT_TOKEN="{{ vault_hcvault_root_token }}"
+    -e VAULT_TOKEN="{{ lookup('env', 'VAULT_TOKEN') }}"
     vault vault auth enable oidc
   register: r
   changed_when: "'Successfully enabled' in r.stdout"
@@ -31,7 +31,7 @@
 - name: Configure OIDC with Keycloak
   shell: >
     docker exec
-    -e VAULT_TOKEN="{{ vault_hcvault_root_token }}"
+    -e VAULT_TOKEN="{{ lookup('env', 'VAULT_TOKEN') }}"
     vault vault write auth/oidc/config
     oidc_discovery_url="https://auth.{{ domain }}/realms/homelab"
     oidc_client_id="hcvault"
@@ -42,7 +42,7 @@
 - name: Configure OIDC admin role
   shell: |
     docker exec \
-      -e VAULT_TOKEN="{{ vault_hcvault_root_token }}" \
+      -e VAULT_TOKEN="{{ lookup('env', 'VAULT_TOKEN') }}" \
       vault vault write auth/oidc/role/admin \
       bound_audiences="hcvault" \
       allowed_redirect_uris="https://vault.{{ internal_subdomain }}.{{ domain }}/ui/vault/auth/oidc/oidc/callback" \
@@ -55,7 +55,7 @@
 - name: Write admin policy
   shell: |
     docker exec -i \
-      -e VAULT_TOKEN="{{ vault_hcvault_root_token }}" \
+      -e VAULT_TOKEN="{{ lookup('env', 'VAULT_TOKEN') }}" \
       vault vault policy write admin - <<'EOF'
     path "*" {
       capabilities = ["create", "read", "update", "delete", "list", "sudo"]
@@ -66,7 +66,7 @@
 - name: Write ci-cd policy
   shell: |
     docker exec -i \
-      -e VAULT_TOKEN="{{ vault_hcvault_root_token }}" \
+      -e VAULT_TOKEN="{{ lookup('env', 'VAULT_TOKEN') }}" \
       vault vault policy write ci-cd - <<'EOF'
     path "secret/data/ci-cd/*" {
       capabilities = ["read", "list"]
@@ -86,7 +86,7 @@
 - name: Enable AppRole auth method
   shell: >
     docker exec
-    -e VAULT_TOKEN="{{ vault_hcvault_root_token }}"
+    -e VAULT_TOKEN="{{ lookup('env', 'VAULT_TOKEN') }}"
     vault vault auth enable approle
   register: r
   changed_when: "'Successfully enabled' in r.stdout"
@@ -95,7 +95,7 @@
 - name: Create CI/CD AppRole
   shell: >
     docker exec
-    -e VAULT_TOKEN="{{ vault_hcvault_root_token }}"
+    -e VAULT_TOKEN="{{ lookup('env', 'VAULT_TOKEN') }}"
     vault vault write auth/approle/role/ci-cd
     token_policies="ci-cd"
     token_ttl="1h"
@@ -106,7 +106,7 @@
 - name: Enable SSH secrets engine
   shell: >
     docker exec
-    -e VAULT_TOKEN="{{ vault_hcvault_root_token }}"
+    -e VAULT_TOKEN="{{ lookup('env', 'VAULT_TOKEN') }}"
     vault vault secrets enable -path=ssh ssh
   register: r
   changed_when: "'Successfully enabled' in r.stdout"
@@ -115,7 +115,7 @@
 - name: Generate SSH CA key pair in Vault
   shell: >
     docker exec
-    -e VAULT_TOKEN="{{ vault_hcvault_root_token }}"
+    -e VAULT_TOKEN="{{ lookup('env', 'VAULT_TOKEN') }}"
     vault vault write ssh/config/ca generate_signing_key=true
   register: r
   changed_when: "'keys cannot be replaced' not in r.stderr and 'keys are already configured' not in r.stderr"
@@ -124,7 +124,7 @@
 - name: Create SSH signing role for CI/CD
   shell: >
     docker exec
-    -e VAULT_TOKEN="{{ vault_hcvault_root_token }}"
+    -e VAULT_TOKEN="{{ lookup('env', 'VAULT_TOKEN') }}"
     vault vault write ssh/roles/ci-cd
     key_type=ca
     allowed_users="{{ deploy_user }}"
@@ -137,7 +137,7 @@
 - name: Create SSH signing role for users
   shell: |
     docker exec -i \
-      -e VAULT_TOKEN="{{ vault_hcvault_root_token }}" \
+      -e VAULT_TOKEN="{{ lookup('env', 'VAULT_TOKEN') }}" \
       vault vault write ssh/roles/user - <<'EOF'
     {
       "key_type": "ca",
@@ -157,7 +157,7 @@
 - name: Read Vault SSH CA public key
   shell: >
     docker exec
-    -e VAULT_TOKEN="{{ vault_hcvault_root_token }}"
+    -e VAULT_TOKEN="{{ lookup('env', 'VAULT_TOKEN') }}"
     vault vault read -field=public_key ssh/config/ca
   register: vault_ssh_ca_pubkey
   changed_when: false

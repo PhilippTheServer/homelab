@@ -147,8 +147,7 @@ homelab/
 ├── ansible/
 │   ├── inventory/hosts.yml
 │   ├── group_vars/all/
-│   │   ├── vars.yml          # domain, IPs, service versions
-│   │   └── vault.yml         # ansible-vault encrypted secrets
+│   │   └── vars.yml          # domain, IPs, service versions, HCVault lookups
 │   ├── roles/
 │   │   ├── common/           # Docker, UFW, deploy user
 │   │   ├── traefik/          # reverse proxy + SSL + ddclient DDNS

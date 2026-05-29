@@ -1,0 +1,73 @@
+---
+# New vault var required:
+#   vault_gitlab_api_token — GitLab personal access token (read_api scope),
+#                            create at: GitLab → User Settings → Access Tokens
+
+- Infrastructure:
+    - Traefik:
+        href: "https://traefik.{{ internal_subdomain }}.{{ domain }}"
+        description: Reverse Proxy & Load Balancer
+        icon: traefik.png
+
+    - Pi-hole:
+        href: "http://{{ minipc_ip }}:8080/admin"
+        description: Network-wide Ad Blocker & DNS
+        icon: pi-hole.png
+        widget:
+          type: pihole
+          url: "http://{{ minipc_ip }}:8080"
+          version: 6
+          key: "{{ vault_pihole_webpassword }}"
+
+    - HashiCorp Vault:
+        href: "https://vault.{{ internal_subdomain }}.{{ domain }}"
+        description: Secrets Management
+        icon: hashicorp-vault.png
+
+- Security & Identity:
+    - Keycloak:
+        href: "https://auth.{{ domain }}"
+        description: Identity & Access Management
+        icon: keycloak.png
+        widget:
+          type: keycloak
+          url: "https://auth.{{ domain }}"
+          realm: homelab
+          username: "{{ vault_keycloak_admin_user }}"
+          password: "{{ vault_keycloak_admin_password }}"
+
+    - Vaultwarden:
+        href: "https://bw.{{ internal_subdomain }}.{{ domain }}"
+        description: Password Manager
+        icon: vaultwarden.png
+
+    - Harbor Registry:
+        href: "https://registry.{{ internal_subdomain }}.{{ domain }}"
+        description: Container Image Registry
+        icon: harbor.png
+        widget:
+          type: harbor
+          url: "https://registry.{{ internal_subdomain }}.{{ domain }}"
+          username: admin
+          password: "{{ vault_harbor_admin_password }}"
+
+- Development:
+    - GitLab:
+        href: "https://gitlab.{{ internal_subdomain }}.{{ domain }}"
+        description: DevOps Platform
+        icon: gitlab.png
+        widget:
+          type: gitlab
+          url: "https://gitlab.{{ internal_subdomain }}.{{ domain }}"
+          key: "{{ vault_gitlab_api_token }}"
+
+- Network:
+    - Headscale:
+        href: "https://vpn.{{ domain }}"
+        description: VPN Coordination Server
+        icon: headscale.png
+
+    - Headplane:
+        href: "https://headscale.{{ internal_subdomain }}.{{ domain }}/admin"
+        description: Headscale Admin UI
+        icon: mdi-vpn

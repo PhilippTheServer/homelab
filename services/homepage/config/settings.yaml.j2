@@ -1,0 +1,38 @@
+---
+title: Homelab
+description: "{{ domain }} homelab dashboard"
+
+theme: dark
+color: slate
+
+headerStyle: boxed
+base: "https://dash.{{ internal_subdomain }}.{{ domain }}"
+
+statusStyle: dot
+
+language: en
+
+quicklaunch:
+  searchDescriptions: true
+  hideInternetSearch: false
+  showSearchSuggestions: true
+  hideVisitURL: false
+  provider: duckduckgo
+
+layout:
+  Infrastructure:
+    style: row
+    columns: 3
+    icon: mdi-server-network
+  Security & Identity:
+    style: row
+    columns: 3
+    icon: mdi-shield-lock
+  Development:
+    style: row
+    columns: 3
+    icon: mdi-code-braces
+  Network:
+    style: row
+    columns: 3
+    icon: mdi-network

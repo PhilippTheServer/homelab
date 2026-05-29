@@ -95,7 +95,7 @@ port sharing entry, so the same rules cover both protocols.
 
 ## Required credentials
 
-All secrets live in `ansible/group_vars/all/vault.yml` (Ansible Vault).
+All secrets live in HashiCorp Vault at `secret/data/ansible` and are fetched at runtime via the `community.hashi_vault` Ansible lookup.
 
 | Vault variable | What it is | Where to find it |
 |----------------|-----------|-----------------|
@@ -143,7 +143,7 @@ services/traefik/
 
 Deploy:
 ```bash
-ansible-playbook ansible/site.yml --tags traefik --ask-vault-pass
+ansible-playbook ansible/site.yml --tags traefik
 ```
 
 ---

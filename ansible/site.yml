@@ -30,3 +30,6 @@
 
     - role: harbor
       tags: [harbor]
+
+    - role: homepage
+      tags: [homepage]

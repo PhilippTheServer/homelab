@@ -426,6 +426,26 @@
       "fullScopeAllowed": true,
       "defaultClientScopes": ["web-origins", "acr", "profile", "roles", "email", "basic"],
       "optionalClientScopes": ["address", "phone", "offline_access", "microprofile-jwt"]
+    },
+    {
+      "clientId": "homepage",
+      "name": "Homepage Dashboard",
+      "enabled": true,
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "{{ vault_homepage_oidc_secret }}",
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "protocol": "openid-connect",
+      "redirectUris": [
+        "https://dash.{{ internal_subdomain }}.{{ domain }}/api/auth/callback/keycloak"
+      ],
+      "webOrigins": ["+"],
+      "fullScopeAllowed": true,
+      "defaultClientScopes": ["web-origins", "acr", "profile", "roles", "email", "basic"],
+      "optionalClientScopes": ["address", "phone", "offline_access", "microprofile-jwt"]
     }
   ]
 }

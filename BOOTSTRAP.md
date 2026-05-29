@@ -38,40 +38,44 @@ Infrastructure must be bootstrapped in dependency order. Priority reflects archi
 <summary>exec commands for deployments</summary>
 
 ```bash
+# Pre-requisite: authenticate to HashiCorp Vault (sets ~/.vault-token, valid 8h)
+export VAULT_ADDR=https://vault.home.philippthesurfer.com
+vault login -method=oidc
+
 # 0. Verify connectivity
-ansible minipc -m ping -i ansible/inventory/hosts.yml --ask-vault-pass
+ansible minipc -m ping -i ansible/inventory/hosts.yml
 
 # 1. Provision host
 ansible-playbook ansible/site.yml -i ansible/inventory/hosts.yml \
-  --tags common --ask-vault-pass
+  --tags common
 
 # 2. Traefik (SSL + DDNS prerequisite)
 ansible-playbook ansible/site.yml -i ansible/inventory/hosts.yml \
-  --tags traefik --ask-vault-pass
+  --tags traefik
 
 # 3. Keycloak
 ansible-playbook ansible/site.yml -i ansible/inventory/hosts.yml \
-  --tags keycloak --ask-vault-pass
+  --tags keycloak
 
 # 4. Headscale (wire Keycloak OIDC first — see post-bootstrap below)
 ansible-playbook ansible/site.yml -i ansible/inventory/hosts.yml \
-  --tags headscale --ask-vault-pass
+  --tags headscale
 
 # 5. HashiCorp Vault
 ansible-playbook ansible/site.yml -i ansible/inventory/hosts.yml \
-  --tags hcvault --ask-vault-pass
+  --tags hcvault
 
 # 6. Vaultwarden
 ansible-playbook ansible/site.yml -i ansible/inventory/hosts.yml \
-  --tags vaultwarden --ask-vault-pass
+  --tags vaultwarden
 
 # 7. Pi-hole (migrate existing or fresh deploy)
 ansible-playbook ansible/site.yml -i ansible/inventory/hosts.yml \
-  --tags pihole --ask-vault-pass
+  --tags pihole
 
 # 8. GitLab + Harbor
 ansible-playbook ansible/site.yml -i ansible/inventory/hosts.yml \
-  --tags gitlab,harbor --ask-vault-pass
+  --tags gitlab,harbor
 ```
 
 </details>
@@ -104,10 +108,13 @@ After Keycloak is running, create OIDC clients for each service before deploying
 
 1. Log into `auth.philippthesurfer.com` → create realm `homelab`
 2. Create OIDC clients: `headscale`, `gitlab`, `harbor`, `vaultwarden`
-3. Add each client secret to Vault:
+3. Add each client secret to HashiCorp Vault:
    ```bash
-   ansible-vault edit ansible/group_vars/all/vault.yml
-   # fill in vault_*_oidc_secret fields
+   vault kv patch secret/ansible \
+     headscale_oidc_secret="..." \
+     gitlab_oidc_secret="..." \
+     harbor_oidc_secret="..." \
+     vaultwarden_oidc_secret="..."
    ```
 4. Re-run the affected roles to apply SSO config
 

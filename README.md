@@ -220,7 +220,7 @@ htpasswd -nB philipp
    - Creates target directory on Mini PC
    - Renders template via `template:` module
    - Runs `docker compose up -d`
-3. Add secrets to `vault.yml`, variables to `vars.yml`
+3. Add secret to HCVault (`vault kv patch secret/ansible <field>=<value>`) and its `vault_*` mapping to `vars.yml`
 4. Add role to `ansible/site.yml` with matching tag
 5. Create OIDC client in Keycloak if the service supports SSO
 6. Add Pi-hole DNS record: `<name>.home.philippthesurfer.com` → Mini PC LAN IP
@@ -236,8 +236,7 @@ homelab/
 │   ├── inventory/
 │   │   └── hosts.yml              # Mini PC connection details
 │   ├── group_vars/all/
-│   │   ├── vars.yml               # non-secret config (domain, versions, IPs)
-│   │   └── vault.yml              # hashi_vault lookups — secrets live in HCP Vault
+│   │   └── vars.yml               # config (domain, versions, IPs) + HCVault lookups
 │   ├── roles/
 │   │   ├── common/                # Docker, UFW, deploy user
 │   │   ├── traefik/               # reverse proxy + SSL + ddclient DDNS

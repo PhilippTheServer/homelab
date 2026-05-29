@@ -26,7 +26,7 @@ Authentication for humans uses OIDC via Keycloak. CI/CD uses AppRole.
   - [Delete a secret version](#delete-a-secret-version)
 - [Using secrets in Ansible](#using-secrets-in-ansible)
   - [How it works](#how-it-works)
-  - [The vault.yml lookup file](#the-vaultyml-lookup-file)
+  - [The secrets section of vars.yml](#the-secrets-section-of-varsyml)
   - [Running playbooks](#running-playbooks)
   - [CI/CD via AppRole](#cicd-via-approle)
   - [Adding a new secret](#adding-a-new-secret)
@@ -368,44 +368,19 @@ docker-compose.yml written to Mini PC  (secrets never hit disk on local machine)
 
 The `community.hashi_vault.hashi_vault` lookup plugin (from `ansible/requirements.yml`) makes a single API call to Vault at the start of the play. All `vault_*` variables are derived from that one response — no per-variable round-trips.
 
-### The vault.yml lookup file
+### The secrets section of vars.yml
 
-`ansible/group_vars/all/vault.yml` is a **plain YAML file** (not ansible-vault encrypted). It maps the `vault_*` variable names that templates already reference to fields in the HC Vault secret:
+`ansible/group_vars/all/vars.yml` contains a secrets block at the bottom that maps the `vault_*` variable names that templates reference to fields in the HC Vault KV entry. A single lookup fetches all fields at once — no per-variable round-trips:
 
 ```yaml
----
-# Secrets fetched at runtime from HashiCorp Vault (secret/data/ansible).
-# Auth: run `vault login -method=oidc` before Ansible (sets ~/.vault-token).
-# CI/CD: set VAULT_TOKEN env var from AppRole login.
+_vault_secrets: "{{ lookup('community.hashi_vault.hashi_vault', 'secret/data/ansible') }}"
 
-_hcv: "{{ lookup('community.hashi_vault.hashi_vault', 'secret/data/ansible') }}"
-
-vault_minipc_passwd:              "{{ _hcv.data.minipc_passwd }}"
-vault_namecheap_api_user:         "{{ _hcv.data.namecheap_api_user }}"
-vault_namecheap_api_key:          "{{ _hcv.data.namecheap_api_key }}"
-vault_namecheap_ddns_password:    "{{ _hcv.data.namecheap_ddns_password }}"
-vault_traefik_dashboard_auth:     "{{ _hcv.data.traefik_dashboard_auth }}"
-vault_pihole_webpassword:      "{{ _hcv.data.pihole_webpassword }}"
-vault_keycloak_admin_user:     "{{ _hcv.data.keycloak_admin_user }}"
-vault_keycloak_admin_password: "{{ _hcv.data.keycloak_admin_password }}"
-vault_keycloak_db_password:    "{{ _hcv.data.keycloak_db_password }}"
-vault_hcvault_root_token:      "{{ _hcv.data.hcvault_root_token }}"
-vault_hcvault_oidc_secret:     "{{ _hcv.data.hcvault_oidc_secret }}"
-vault_vaultwarden_db_password: "{{ _hcv.data.vaultwarden_db_password }}"
-vault_vaultwarden_admin_token: "{{ _hcv.data.vaultwarden_admin_token }}"
-vault_vaultwarden_oidc_secret: "{{ _hcv.data.vaultwarden_oidc_secret }}"
-vault_headscale_db_password:   "{{ _hcv.data.headscale_db_password }}"
-vault_headscale_oidc_secret:   "{{ _hcv.data.headscale_oidc_secret }}"
-vault_headplane_api_key:       "{{ _hcv.data.headplane_api_key }}"
-vault_headplane_cookie_secret: "{{ _hcv.data.headplane_cookie_secret }}"
-vault_gitlab_root_password:    "{{ _hcv.data.gitlab_root_password }}"
-vault_gitlab_oidc_secret:      "{{ _hcv.data.gitlab_oidc_secret }}"
-vault_harbor_admin_password:   "{{ _hcv.data.harbor_admin_password }}"
-vault_harbor_db_password:      "{{ _hcv.data.harbor_db_password }}"
-vault_harbor_oidc_secret:      "{{ _hcv.data.harbor_oidc_secret }}"
+vault_minipc_passwd:            "{{ _vault_secrets.data.minipc_passwd }}"
+vault_namecheap_api_user:       "{{ _vault_secrets.data.namecheap_api_user }}"
+# ... (full list in vars.yml)
 ```
 
-The lookup URL is configured in `ansible/ansible.cfg`:
+The lookup URL and auth method are configured in `ansible/ansible.cfg`:
 
 ```ini
 [hashi_vault_collection]
@@ -414,6 +389,8 @@ auth_method = token
 ```
 
 `auth_method = token` means the plugin reads from `VAULT_TOKEN` env var first, then falls back to `~/.vault-token`.
+
+> **Note on `vault_hcvault_root_token`:** this variable is intentionally absent from the lookup list. The `hcvault` configure tasks pass the operator's `VAULT_TOKEN` env var directly into `docker exec` — using the same token Ansible already needs to run the play. Storing the root token inside Vault itself would be circular.
 
 ### Running playbooks
 
@@ -474,11 +451,11 @@ Say you're adding a new service `ntfy` with an admin password. The full workflow
 vault kv patch secret/ansible ntfy_admin_password="$(openssl rand -base64 32)"
 ```
 
-**2. Add the mapping to `vault.yml`**
+**2. Add the mapping to `vars.yml`**
 
 ```yaml
-# ansible/group_vars/all/vault.yml — add one line:
-vault_ntfy_admin_password: "{{ _hcv.data.ntfy_admin_password }}"
+# ansible/group_vars/all/vars.yml — add one line to the secrets block:
+vault_ntfy_admin_password: "{{ _vault_secrets.data.ntfy_admin_password }}"
 ```
 
 **3. Reference it in your Jinja2 template**
@@ -491,7 +468,7 @@ environment:
   NTFY_ADMIN_PASSWORD: "{{ vault_ntfy_admin_password }}"
 ```
 
-**4. Nothing else changes.** The lookup in `vault.yml` already fetches the entire `secret/ansible` dict — the new key is included automatically on the next Ansible run.
+**4. Nothing else changes.** The single `_vault_secrets` lookup already fetches the entire `secret/ansible` dict — the new key is included automatically on the next Ansible run.
 
 ---
 
