@@ -19,6 +19,7 @@ Services are listed in setup priority order — the order in which they should b
 | 4 | **GitLab CE** | Git hosting + CI/CD pipelines | `gitlab.home.philippthesurfer.com` |
 | 4 | **Harbor** | Docker image registry | `harbor.home.philippthesurfer.com` (UI) · `registry.home.philippthesurfer.com` (CLI) |
 | 4 | **Homepage** | Homelab dashboard | `dash.home.philippthesurfer.com` |
+| 4 | **Monitoring** | Grafana + Prometheus + Loki — metrics and log aggregation | `monitoring.home.philippthesurfer.com` |
 
 All services (except Pi-hole) sit behind Traefik with a wildcard Let's Encrypt cert (`*.home.philippthesurfer.com`). Each service stack is self-contained with its own Postgres (and Redis where needed) — stacks can be rebuilt or replaced independently.
 
@@ -63,6 +64,7 @@ Each Ansible role also has its own README:
 | gitlab | [ansible/roles/gitlab/README.md](ansible/roles/gitlab/README.md) |
 | harbor | [ansible/roles/harbor/README.md](ansible/roles/harbor/README.md) |
 | homepage | [ansible/roles/homepage/README.md](ansible/roles/homepage/README.md) |
+| monitoring | [ansible/roles/monitoring/README.md](ansible/roles/monitoring/README.md) |
 
 ---
 

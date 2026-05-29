@@ -32,6 +32,10 @@ services:
 {% endif %}
       - --log.level=INFO
       - --accesslog=true
+      # Prometheus metrics endpoint (internal, scraped by monitoring stack)
+      - --metrics.prometheus=true
+      - --entrypoints.metrics.address=:8082
+      - --metrics.prometheus.entryPoint=metrics
     environment:
       NAMECHEAP_API_USER: "{{ vault_namecheap_api_user }}"
       NAMECHEAP_API_KEY: "{{ vault_namecheap_api_key }}"

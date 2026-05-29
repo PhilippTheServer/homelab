@@ -1,0 +1,91 @@
+---
+- name: Create monitoring config directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: '0755'
+  loop:
+    - "{{ homelab_base_dir }}/services/monitoring"
+    - "{{ homelab_base_dir }}/services/monitoring/grafana/provisioning/datasources"
+    - "{{ homelab_base_dir }}/services/monitoring/grafana/provisioning/dashboards"
+    - "{{ homelab_base_dir }}/services/monitoring/grafana/dashboards"
+    - "{{ homelab_base_dir }}/services/monitoring/prometheus"
+    - "{{ homelab_base_dir }}/services/monitoring/loki"
+    - "{{ homelab_base_dir }}/services/monitoring/promtail"
+
+- name: Render docker-compose.yml
+  template:
+    src: "{{ playbook_dir }}/../services/monitoring/docker-compose.yml.j2"
+    dest: "{{ homelab_base_dir }}/services/monitoring/docker-compose.yml"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: '0640'
+  notify: restart monitoring
+
+- name: Render prometheus.yml
+  template:
+    src: "{{ playbook_dir }}/../services/monitoring/prometheus/prometheus.yml.j2"
+    dest: "{{ homelab_base_dir }}/services/monitoring/prometheus/prometheus.yml"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: '0644'
+  notify: restart monitoring
+
+- name: Render loki.yml
+  template:
+    src: "{{ playbook_dir }}/../services/monitoring/loki/loki.yml.j2"
+    dest: "{{ homelab_base_dir }}/services/monitoring/loki/loki.yml"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: '0644'
+  notify: restart monitoring
+
+- name: Render promtail.yml
+  template:
+    src: "{{ playbook_dir }}/../services/monitoring/promtail/promtail.yml.j2"
+    dest: "{{ homelab_base_dir }}/services/monitoring/promtail/promtail.yml"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: '0644'
+  notify: restart monitoring
+
+- name: Render Grafana datasources provisioning
+  template:
+    src: "{{ playbook_dir }}/../services/monitoring/grafana/provisioning/datasources/datasources.yml.j2"
+    dest: "{{ homelab_base_dir }}/services/monitoring/grafana/provisioning/datasources/datasources.yml"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: '0644'
+  notify: restart monitoring
+
+- name: Render Grafana dashboard provider config
+  template:
+    src: "{{ playbook_dir }}/../services/monitoring/grafana/provisioning/dashboards/dashboards.yml.j2"
+    dest: "{{ homelab_base_dir }}/services/monitoring/grafana/provisioning/dashboards/dashboards.yml"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: '0644'
+  notify: restart monitoring
+
+- name: Download Node Exporter Full dashboard
+  get_url:
+    url: "https://grafana.com/api/dashboards/1860/revisions/latest/download"
+    dest: "{{ homelab_base_dir }}/services/monitoring/grafana/dashboards/node-exporter-full.json"
+    mode: '0644'
+    force: false
+
+- name: Download cAdvisor container dashboard
+  get_url:
+    url: "https://grafana.com/api/dashboards/14282/revisions/latest/download"
+    dest: "{{ homelab_base_dir }}/services/monitoring/grafana/dashboards/cadvisor.json"
+    mode: '0644'
+    force: false
+
+- name: Ensure monitoring stack is running
+  command:
+    cmd: docker compose up -d --remove-orphans
+    chdir: "{{ homelab_base_dir }}/services/monitoring"
+  become_user: "{{ deploy_user }}"
+  changed_when: false

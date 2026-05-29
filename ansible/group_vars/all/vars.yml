@@ -23,6 +23,11 @@ gitlab_version: "19.0.0-ce.0"
 harbor_version: "v2.14.0"
 pihole_version: "2026.05.0"
 homepage_version: "latest"
+grafana_version: "11.2.0"
+prometheus_version: "v2.54.1"
+loki_version: "3.2.1"
+node_exporter_version: "v1.8.2"
+cadvisor_version: "v0.49.1"
 
 # ── Secrets (fetched from HashiCorp Vault at runtime) ──────────────────────────
 # Requires VAULT_TOKEN in the environment before running any playbook.
@@ -55,3 +60,5 @@ vault_harbor_oidc_secret:     "{{ _vault_secrets.harbor_oidc_secret }}"
 vault_pihole_webpassword:       "{{ _vault_secrets.pihole_webpassword }}"
 vault_homepage_oidc_secret:     "{{ _vault_secrets.homepage_oidc_secret }}"
 vault_homepage_nextauth_secret: "{{ _vault_secrets.homepage_nextauth_secret }}"
+vault_grafana_admin_password:   "{{ _vault_secrets.grafana_admin_password }}"
+vault_grafana_oidc_secret:      "{{ _vault_secrets.grafana_oidc_secret }}"

@@ -17,6 +17,7 @@
     owner: "{{ deploy_user }}"
     group: "{{ deploy_user }}"
     mode: '0640'
+  register: _realm_template
 
 - name: Render docker-compose.yml
   template:
@@ -33,3 +34,120 @@
     chdir: "{{ homelab_base_dir }}/services/keycloak"
   become_user: "{{ deploy_user }}"
   changed_when: false
+
+# --import-realm at startup only runs when the realm does not yet exist in the DB
+# (IGNORE_EXISTING strategy). When the realm template changes on a running instance,
+# we sync clients directly via the Admin REST API so user accounts are preserved.
+- name: Sync realm clients via Admin API
+  when: _realm_template.changed
+  block:
+    - name: Get admin token
+      uri:
+        url: "https://auth.{{ domain }}/realms/master/protocol/openid-connect/token"
+        method: POST
+        body_format: form-urlencoded
+        body:
+          client_id: admin-cli
+          username: "{{ vault_keycloak_admin_user }}"
+          password: "{{ vault_keycloak_admin_password }}"
+          grant_type: password
+      register: _kc_token
+      no_log: true
+
+    - name: Read rendered realm JSON
+      slurp:
+        src: "{{ homelab_base_dir }}/services/keycloak/import/realm-homelab.json"
+      register: _realm_raw
+
+    - name: Get existing homelab clients
+      uri:
+        url: "https://auth.{{ domain }}/admin/realms/homelab/clients?max=200"
+        headers:
+          Authorization: "Bearer {{ _kc_token.json.access_token }}"
+        status_code: [200, 404]
+      register: _existing_clients
+
+    - name: Build clientId-to-id map
+      set_fact:
+        _client_id_map: >-
+          {{ _existing_clients.json | items2dict(key_name='clientId', value_name='id')
+             if _existing_clients.status == 200 else {} }}
+
+    - name: Create new clients
+      uri:
+        url: "https://auth.{{ domain }}/admin/realms/homelab/clients"
+        method: POST
+        headers:
+          Authorization: "Bearer {{ _kc_token.json.access_token }}"
+        body: "{{ item }}"
+        body_format: json
+        status_code: 201
+      loop: "{{ (_realm_raw.content | b64decode | from_json).clients }}"
+      when:
+        - _existing_clients.status == 200
+        - item.clientId not in _client_id_map
+      no_log: true
+
+    - name: Update existing clients
+      uri:
+        url: "https://auth.{{ domain }}/admin/realms/homelab/clients/{{ _client_id_map[item.clientId] }}"
+        method: PUT
+        headers:
+          Authorization: "Bearer {{ _kc_token.json.access_token }}"
+        body: "{{ item }}"
+        body_format: json
+        status_code: 204
+      loop: "{{ (_realm_raw.content | b64decode | from_json).clients }}"
+      when:
+        - _existing_clients.status == 200
+        - item.clientId in _client_id_map
+      no_log: true
+
+    # The realm roles mapper lives in the 'roles' client scope, not in a client,
+    # so it is not touched by the client sync above. Update it explicitly so that
+    # realm_access.roles is included in the userinfo response (needed for Grafana
+    # role mapping via role_attribute_path).
+    - name: Get roles client scope ID
+      uri:
+        url: "https://auth.{{ domain }}/admin/realms/homelab/client-scopes"
+        headers:
+          Authorization: "Bearer {{ _kc_token.json.access_token }}"
+      register: _client_scopes
+
+    - name: Set roles scope and mapper IDs
+      set_fact:
+        _roles_scope_id: "{{ (_client_scopes.json | selectattr('name', 'equalto', 'roles') | list | first).id }}"
+
+    - name: Get protocol mappers for roles scope
+      uri:
+        url: "https://auth.{{ domain }}/admin/realms/homelab/client-scopes/{{ _roles_scope_id }}/protocol-mappers/models"
+        headers:
+          Authorization: "Bearer {{ _kc_token.json.access_token }}"
+      register: _roles_mappers
+
+    - name: Set realm roles mapper ID
+      set_fact:
+        _realm_roles_mapper_id: "{{ (_roles_mappers.json | selectattr('name', 'equalto', 'realm roles') | list | first).id }}"
+
+    - name: Update realm roles mapper to include userinfo claim
+      uri:
+        url: "https://auth.{{ domain }}/admin/realms/homelab/client-scopes/{{ _roles_scope_id }}/protocol-mappers/models/{{ _realm_roles_mapper_id }}"
+        method: PUT
+        headers:
+          Authorization: "Bearer {{ _kc_token.json.access_token }}"
+        body:
+          id: "{{ _realm_roles_mapper_id }}"
+          name: "realm roles"
+          protocol: "openid-connect"
+          protocolMapper: "oidc-usermodel-realm-role-mapper"
+          consentRequired: false
+          config:
+            "user.attribute": "foo"
+            "access.token.claim": "true"
+            "userinfo.token.claim": "true"
+            "claim.name": "realm_access.roles"
+            "jsonType.label": "String"
+            "multivalued": "true"
+        body_format: json
+        status_code: 204
+      no_log: true

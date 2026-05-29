@@ -39,6 +39,7 @@ Infrastructure must be bootstrapped in dependency order.
 [priority 4]      gitlab      → Push this repo here; CI takes over re-deploys
 [priority 4]      harbor      → Registry
 [priority 4]      homepage    → Dashboard
+[priority 4]      monitoring  → Metrics + log aggregation
 ```
 
 <details>
@@ -80,9 +81,9 @@ ansible-playbook ansible/site.yml -i ansible/inventory/hosts.yml \
 ansible-playbook ansible/site.yml -i ansible/inventory/hosts.yml \
   --tags pihole
 
-# 8. GitLab + Harbor + Homepage
+# 8. GitLab + Harbor + Homepage + Monitoring
 ansible-playbook ansible/site.yml -i ansible/inventory/hosts.yml \
-  --tags gitlab,harbor,homepage
+  --tags gitlab,harbor,homepage,monitoring
 ```
 
 </details>
@@ -196,7 +197,9 @@ vault kv put secret/ansible \
   harbor_db_password="..." \
   harbor_oidc_secret="PLACEHOLDER" \
   homepage_oidc_secret="PLACEHOLDER" \
-  homepage_nextauth_secret="..."
+  homepage_nextauth_secret="..." \
+  grafana_admin_password="$(openssl rand -base64 32)" \
+  grafana_oidc_secret="PLACEHOLDER"
 ```
 
 Fields marked `PLACEHOLDER` are filled in during post-deploy wiring steps below.
@@ -240,7 +243,8 @@ vault kv patch secret/ansible \
   gitlab_oidc_secret="..." \
   harbor_oidc_secret="..." \
   vaultwarden_oidc_secret="..." \
-  homepage_oidc_secret="..."
+  homepage_oidc_secret="..." \
+  grafana_oidc_secret="..."
 ```
 
 4. Re-run the affected roles to apply SSO config.

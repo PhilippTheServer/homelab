@@ -33,3 +33,6 @@
 
     - role: homepage
       tags: [homepage]
+
+    - role: monitoring
+      tags: [monitoring]

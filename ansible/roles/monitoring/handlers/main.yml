@@ -1,0 +1,6 @@
+---
+- name: restart monitoring
+  command:
+    cmd: docker compose up -d --force-recreate --remove-orphans
+    chdir: "{{ homelab_base_dir }}/services/monitoring"
+  become_user: "{{ deploy_user }}"

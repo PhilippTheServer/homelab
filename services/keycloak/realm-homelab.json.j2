@@ -165,6 +165,7 @@
           "config": {
             "user.attribute": "foo",
             "access.token.claim": "true",
+            "userinfo.token.claim": "true",
             "claim.name": "realm_access.roles",
             "jsonType.label": "String",
             "multivalued": "true"
@@ -421,6 +422,26 @@
       "protocol": "openid-connect",
       "redirectUris": [
         "https://harbor.{{ internal_subdomain }}.{{ domain }}/c/oidc/callback"
+      ],
+      "webOrigins": ["+"],
+      "fullScopeAllowed": true,
+      "defaultClientScopes": ["web-origins", "acr", "profile", "roles", "email", "basic"],
+      "optionalClientScopes": ["address", "phone", "offline_access", "microprofile-jwt"]
+    },
+    {
+      "clientId": "grafana",
+      "name": "Grafana",
+      "enabled": true,
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "{{ vault_grafana_oidc_secret }}",
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "protocol": "openid-connect",
+      "redirectUris": [
+        "https://monitoring.{{ internal_subdomain }}.{{ domain }}/login/generic_oauth"
       ],
       "webOrigins": ["+"],
       "fullScopeAllowed": true,

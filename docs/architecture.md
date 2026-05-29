@@ -28,6 +28,7 @@ graph TD
         GL["GitLab CE\nGit · CI/CD\n+ Postgres + Redis"]
         HB["Harbor\nDocker Registry\n+ Postgres + Redis"]
         HP["Homepage\nDashboard"]
+        MON["Monitoring\nGrafana · Prometheus · Loki"]
     end
 
     subgraph LAN ["Local Network — 192.168.178.0/24"]
@@ -55,7 +56,7 @@ graph TD
     V1 & V2 -->|"Tailscale/Headscale\nVPN mesh"| HS
     V1 & V2 -->|"HTTPS via VPN"| Traefik
 
-    Traefik --> KC & HS & HCV & VW & GL & HB & PH & HP
+    Traefik --> KC & HS & HCV & VW & GL & HB & PH & HP & MON
 ```
 
 ---
@@ -137,6 +138,13 @@ Each stack is an independent Docker Compose file with its own database.
 - **Auth:** OIDC via Keycloak
 - **Compose:** `services/homepage/docker-compose.yml`
 
+### Monitoring (Priority 4)
+- **Role:** Observability stack — host + container metrics and log aggregation
+- **Components:** Grafana (UI), Prometheus (metrics), Loki (logs), Promtail (Docker log shipper), Node Exporter (host metrics), cAdvisor (container metrics)
+- **Auth:** OIDC via Keycloak — login form disabled, all access through Keycloak
+- **Traefik metrics:** Prometheus scrapes Traefik's `/metrics` endpoint at `:8082` via the `proxy` Docker network
+- **Compose:** `services/monitoring/docker-compose.yml`
+
 ---
 
 ## Infrastructure as Code
@@ -166,7 +174,8 @@ homelab/
 │   │   ├── pihole/
 │   │   ├── gitlab/
 │   │   ├── harbor/
-│   │   └── homepage/
+│   │   ├── homepage/
+│   │   └── monitoring/
 │   └── site.yml
 ├── services/
 │   ├── traefik/
@@ -177,7 +186,8 @@ homelab/
 │   ├── pihole/
 │   ├── gitlab/
 │   ├── harbor/
-│   └── homepage/
+│   ├── homepage/
+│   └── monitoring/
 ├── docs/
 │   ├── architecture.md       # this file
 │   ├── bootstrap.md          # step-by-step first deploy
@@ -200,6 +210,7 @@ pihole      → DNS + DHCP
 gitlab      → push this repo to GitLab; CI takes over re-deploys
 harbor      → registry
 homepage    → dashboard
+monitoring  → metrics + logs
 ```
 
 ---

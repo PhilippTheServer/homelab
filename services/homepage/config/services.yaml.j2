@@ -61,6 +61,17 @@
           url: "https://gitlab.{{ internal_subdomain }}.{{ domain }}"
           key: "{{ vault_gitlab_api_token }}"
 
+- Monitoring:
+    - Grafana:
+        href: "https://monitoring.{{ internal_subdomain }}.{{ domain }}"
+        description: Metrics & Log Dashboards
+        icon: grafana.png
+        widget:
+          type: grafana
+          url: "https://monitoring.{{ internal_subdomain }}.{{ domain }}"
+          username: admin
+          password: "{{ vault_grafana_admin_password }}"
+
 - Network:
     - Headscale:
         href: "https://vpn.{{ domain }}"
