@@ -69,6 +69,14 @@
     mode: '0644'
   notify: restart monitoring
 
+- name: Copy Container Logs dashboard
+  copy:
+    src: "{{ playbook_dir }}/../services/monitoring/grafana/dashboards/container-logs.json"
+    dest: "{{ homelab_base_dir }}/services/monitoring/grafana/dashboards/container-logs.json"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: '0644'
+
 - name: Download Node Exporter Full dashboard
   get_url:
     url: "https://grafana.com/api/dashboards/1860/revisions/latest/download"

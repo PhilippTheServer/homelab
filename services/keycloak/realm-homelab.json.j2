@@ -326,6 +326,9 @@
       ]
     }
   ],
+  "groups": [
+    { "name": "gitlab-admins" }
+  ],
   "clients": [
     {
       "clientId": "headscale",
@@ -405,7 +408,7 @@
       ],
       "webOrigins": ["+"],
       "fullScopeAllowed": true,
-      "defaultClientScopes": ["web-origins", "acr", "profile", "roles", "email", "basic"],
+      "defaultClientScopes": ["web-origins", "acr", "profile", "roles", "email", "basic", "groups"],
       "optionalClientScopes": ["address", "phone", "offline_access", "microprofile-jwt"]
     },
     {

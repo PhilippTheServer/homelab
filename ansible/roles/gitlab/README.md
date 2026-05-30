@@ -63,6 +63,12 @@ docker exec -it gitlab-runner gitlab-runner register \
   --docker-image alpine
 ```
 
+**Admin access** must be granted manually — GitLab CE 19 does not support automatic admin promotion via OIDC group membership (`omniauth_admin_groups` was removed in GitLab 16.1). Use the Rails runner or log in as `root`:
+
+```bash
+docker exec gitlab gitlab-rails runner 'User.find_by(username: "philipp").update!(admin: true)'
+```
+
 **Memory tuning:** Puma workers (2), Puma threads (1–4), and Sidekiq concurrency (5) are set conservatively for a 16 GB host shared with other services. Prometheus monitoring is disabled to reduce overhead.
 
 **SSH port:** Git operations use port 2222. Add to `~/.ssh/config`:

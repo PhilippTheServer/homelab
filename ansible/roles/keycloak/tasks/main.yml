@@ -41,7 +41,7 @@
 - name: Sync realm clients via Admin API
   when: _realm_template.changed
   block:
-    - name: Get admin token
+    - name: Get admin token (client sync)
       uri:
         url: "https://auth.{{ domain }}/realms/master/protocol/openid-connect/token"
         method: POST
@@ -51,7 +51,7 @@
           username: "{{ vault_keycloak_admin_user }}"
           password: "{{ vault_keycloak_admin_password }}"
           grant_type: password
-      register: _kc_token
+      register: _kc_token_sync
       no_log: true
 
     - name: Read rendered realm JSON
@@ -63,7 +63,7 @@
       uri:
         url: "https://auth.{{ domain }}/admin/realms/homelab/clients?max=200"
         headers:
-          Authorization: "Bearer {{ _kc_token.json.access_token }}"
+          Authorization: "Bearer {{ _kc_token_sync.json.access_token }}"
         status_code: [200, 404]
       register: _existing_clients
 
@@ -78,7 +78,7 @@
         url: "https://auth.{{ domain }}/admin/realms/homelab/clients"
         method: POST
         headers:
-          Authorization: "Bearer {{ _kc_token.json.access_token }}"
+          Authorization: "Bearer {{ _kc_token_sync.json.access_token }}"
         body: "{{ item }}"
         body_format: json
         status_code: 201
@@ -93,7 +93,7 @@
         url: "https://auth.{{ domain }}/admin/realms/homelab/clients/{{ _client_id_map[item.clientId] }}"
         method: PUT
         headers:
-          Authorization: "Bearer {{ _kc_token.json.access_token }}"
+          Authorization: "Bearer {{ _kc_token_sync.json.access_token }}"
         body: "{{ item }}"
         body_format: json
         status_code: 204
@@ -107,22 +107,22 @@
     # so it is not touched by the client sync above. Update it explicitly so that
     # realm_access.roles is included in the userinfo response (needed for Grafana
     # role mapping via role_attribute_path).
-    - name: Get roles client scope ID
+    - name: Get client scopes (sync)
       uri:
         url: "https://auth.{{ domain }}/admin/realms/homelab/client-scopes"
         headers:
-          Authorization: "Bearer {{ _kc_token.json.access_token }}"
-      register: _client_scopes
+          Authorization: "Bearer {{ _kc_token_sync.json.access_token }}"
+      register: _client_scopes_sync
 
-    - name: Set roles scope and mapper IDs
+    - name: Set roles scope ID
       set_fact:
-        _roles_scope_id: "{{ (_client_scopes.json | selectattr('name', 'equalto', 'roles') | list | first).id }}"
+        _roles_scope_id: "{{ (_client_scopes_sync.json | selectattr('name', 'equalto', 'roles') | list | first).id }}"
 
     - name: Get protocol mappers for roles scope
       uri:
         url: "https://auth.{{ domain }}/admin/realms/homelab/client-scopes/{{ _roles_scope_id }}/protocol-mappers/models"
         headers:
-          Authorization: "Bearer {{ _kc_token.json.access_token }}"
+          Authorization: "Bearer {{ _kc_token_sync.json.access_token }}"
       register: _roles_mappers
 
     - name: Set realm roles mapper ID
@@ -134,7 +134,7 @@
         url: "https://auth.{{ domain }}/admin/realms/homelab/client-scopes/{{ _roles_scope_id }}/protocol-mappers/models/{{ _realm_roles_mapper_id }}"
         method: PUT
         headers:
-          Authorization: "Bearer {{ _kc_token.json.access_token }}"
+          Authorization: "Bearer {{ _kc_token_sync.json.access_token }}"
         body:
           id: "{{ _realm_roles_mapper_id }}"
           name: "realm roles"
@@ -151,3 +151,64 @@
         body_format: json
         status_code: 204
       no_log: true
+
+# Scope assignments and group management run on every play — the Keycloak client PUT
+# endpoint silently ignores defaultClientScopes, so scopes must be assigned via a
+# dedicated endpoint. PUT to add a scope and POST a group are both idempotent.
+- name: Ensure Keycloak realm state (scopes + groups)
+  block:
+    - name: Get admin token (realm state)
+      uri:
+        url: "https://auth.{{ domain }}/realms/master/protocol/openid-connect/token"
+        method: POST
+        body_format: form-urlencoded
+        body:
+          client_id: admin-cli
+          username: "{{ vault_keycloak_admin_user }}"
+          password: "{{ vault_keycloak_admin_password }}"
+          grant_type: password
+      register: _kc_token
+      no_log: true
+
+    - name: Get existing homelab clients (realm state)
+      uri:
+        url: "https://auth.{{ domain }}/admin/realms/homelab/clients?max=200"
+        headers:
+          Authorization: "Bearer {{ _kc_token.json.access_token }}"
+      register: _clients_state
+
+    - name: Build clientId-to-id map (realm state)
+      set_fact:
+        _client_id_map_state: >-
+          {{ _clients_state.json | items2dict(key_name='clientId', value_name='id') }}
+
+    - name: Get client scopes (realm state)
+      uri:
+        url: "https://auth.{{ domain }}/admin/realms/homelab/client-scopes"
+        headers:
+          Authorization: "Bearer {{ _kc_token.json.access_token }}"
+      register: _client_scopes
+
+    - name: Set groups scope ID
+      set_fact:
+        _groups_scope_id: "{{ (_client_scopes.json | selectattr('name', 'equalto', 'groups') | list | first).id }}"
+
+    - name: Add groups scope to gitlab client default scopes
+      uri:
+        url: "https://auth.{{ domain }}/admin/realms/homelab/clients/{{ _client_id_map_state['gitlab'] }}/default-client-scopes/{{ _groups_scope_id }}"
+        method: PUT
+        headers:
+          Authorization: "Bearer {{ _kc_token.json.access_token }}"
+        status_code: [204]
+      when: "'gitlab' in _client_id_map_state"
+
+    - name: Ensure gitlab-admins group exists
+      uri:
+        url: "https://auth.{{ domain }}/admin/realms/homelab/groups"
+        method: POST
+        headers:
+          Authorization: "Bearer {{ _kc_token.json.access_token }}"
+        body:
+          name: "gitlab-admins"
+        body_format: json
+        status_code: [201, 409]
