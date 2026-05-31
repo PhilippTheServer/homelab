@@ -1,27 +1,28 @@
 # monitoring
 
-Metrics and log aggregation stack: Grafana + Prometheus + Loki.
+Full observability stack: Grafana + Prometheus + Loki + Tempo.
 
 ## Overview
 
-This role deploys a full observability stack as a single Docker Compose stack. Grafana is the unified UI for both metrics (Prometheus) and logs (Loki). All access to Grafana is via Keycloak SSO — the login form is disabled and the browser redirects directly to Keycloak on every visit. Prometheus and Loki are internal-only containers; they are never exposed through Traefik.
+This role deploys a complete observability stack as a single Docker Compose stack. Grafana is the unified UI for metrics (Prometheus), logs (Loki), and traces (Tempo). All access to Grafana is via Keycloak SSO — the login form is disabled and the browser redirects directly to Keycloak on every visit. Prometheus, Loki, and Tempo are internal-only containers; they are never exposed through Traefik.
 
-Traefik's built-in Prometheus endpoint (`:8082/metrics`) is scraped automatically. Prometheus also runs on the `proxy` Docker network to reach the Traefik container directly by name.
+Traefik sends structured JSON access logs (captured by Promtail) and OTLP traces (sent directly to Tempo) so every HTTP request is visible across all three pillars. Grafana's datasource provisioning wires trace↔log and trace↔metric correlation automatically.
 
 ## Prerequisites
 
 - `common` role applied (Docker, `proxy` network)
-- `traefik` role running (TLS termination + metrics endpoint enabled)
+- `traefik` role running (TLS termination, metrics endpoint, and OTLP tracing enabled)
 - `keycloak` role running (OIDC SSO)
 
 ## Containers
 
 | Container | Purpose | Port (internal) |
 |---|---|---|
-| `grafana` | Dashboard UI — Prometheus + Loki, SSO via Keycloak | 3000 |
-| `prometheus` | Metrics scraper + TSDB (30-day retention) | 9090 |
+| `grafana` | Dashboard UI — metrics, logs, traces; SSO via Keycloak | 3000 |
+| `prometheus` | Metrics scraper + TSDB (30-day retention); remote write receiver for Tempo | 9090 |
 | `loki` | Log aggregation — receives logs from Promtail | 3100 |
 | `promtail` | Docker log shipper — tails all container logs → Loki | 9080 |
+| `tempo` | Distributed tracing backend — OTLP receiver, 48h retention | 3200 (HTTP), 4317 (gRPC), 4318 (HTTP OTLP) |
 | `node-exporter` | Host metrics (CPU, memory, disk, network) | 9100 |
 | `cadvisor` | Per-container resource metrics | 8080 |
 
@@ -30,14 +31,15 @@ Traefik's built-in Prometheus endpoint (`:8082/metrics`) is scraped automaticall
 | File | Purpose |
 |---|---|
 | `/opt/homelab/services/monitoring/docker-compose.yml` | Stack definition |
-| `/opt/homelab/services/monitoring/prometheus/prometheus.yml` | Scrape targets |
+| `/opt/homelab/services/monitoring/prometheus/prometheus.yml` | Scrape targets (includes Tempo self-metrics) |
 | `/opt/homelab/services/monitoring/loki/loki.yml` | Loki single-binary config (filesystem storage) |
 | `/opt/homelab/services/monitoring/promtail/promtail.yml` | Docker log discovery and shipping config |
-| `/opt/homelab/services/monitoring/grafana/provisioning/datasources/datasources.yml` | Auto-configures Prometheus + Loki datasources |
+| `/opt/homelab/services/monitoring/tempo/tempo.yml` | Tempo single-binary config — OTLP receivers, metrics generator |
+| `/opt/homelab/services/monitoring/grafana/provisioning/datasources/datasources.yml` | Auto-configures Prometheus, Loki, and Tempo datasources with correlation |
 | `/opt/homelab/services/monitoring/grafana/provisioning/dashboards/dashboards.yml` | Dashboard file provider pointing to `/etc/grafana/dashboards` |
-| `/opt/homelab/services/monitoring/grafana/dashboards/*.json` | Pre-provisioned dashboards (Node Exporter Full, cAdvisor) — downloaded by Ansible at deploy time |
+| `/opt/homelab/services/monitoring/grafana/dashboards/*.json` | Pre-provisioned dashboards — downloaded by Ansible at deploy time |
 
-Prometheus retains 30 days of metrics. Loki uses on-disk TSDB storage under a named Docker volume.
+Prometheus retains 30 days of metrics. Loki uses on-disk TSDB storage under a named Docker volume. Tempo retains traces for 48 hours and pushes service-graph and span-metrics into Prometheus via remote write.
 
 ## Secrets
 
@@ -72,8 +74,12 @@ ansible-playbook ansible/site.yml --tags monitoring
 
 **Role mapping.** Keycloak realm role `admin` → Grafana `Admin`. All other authenticated users get `Viewer`. To promote a user to Editor, assign them the `editor` Keycloak role and update the `GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_PATH` expression, then redeploy.
 
-**Traefik metrics.** The role expects `--metrics.prometheus=true` and `--entrypoints.metrics.address=:8082` in the Traefik command. These flags are included in the Traefik role's `docker-compose.yml`. Re-run `--tags traefik` if Traefik was deployed before this role.
+**Traefik metrics.** The role expects `--metrics.prometheus=true`, `--metrics.prometheus.addRoutersLabels=true`, `--metrics.prometheus.addServicesLabels=true`, `--metrics.prometheus.addEntryPointsLabels=true`, and `--entrypoints.metrics.address=:8082` in the Traefik command. These flags are included in the Traefik role's `docker-compose.yml`. Re-run `--tags traefik` if Traefik was deployed before this role.
 
-**Dashboards.** Two community dashboards are provisioned at deploy time by downloading their JSON from grafana.com: Node Exporter Full (ID 1860) and cAdvisor (ID 14282). Additional dashboards can be added by placing JSON files in `/opt/homelab/services/monitoring/grafana/dashboards/` — Grafana picks them up within 30 seconds without a restart.
+**Traefik tracing.** Traefik sends OTLP traces directly to Tempo via gRPC (`tempo:4317` on the `proxy` network). Tempo is attached to both `proxy` and `internal` networks. Traefik's JSON access logs include a `traceID` field — Grafana's Loki datasource uses a derived field to turn it into a clickable link to the corresponding trace.
+
+**Dashboards.** Three community dashboards are provisioned at deploy time: Node Exporter Full (ID 1860), Traefik v3 (ID 17346). Additional dashboards can be added by placing JSON files in `/opt/homelab/services/monitoring/grafana/dashboards/` — Grafana picks them up within 30 seconds without a restart.
+
+**Tempo metrics generator.** Tempo generates service-graph and span-metrics from traces and pushes them into Prometheus via remote write (`http://prometheus:9090/api/v1/write`). Prometheus must be started with `--web.enable-remote-write-receiver` (already included).
 
 **Loki log retention.** There is no default retention policy. To add one, set `retention_period` under `limits_config` in `loki.yml.j2` and re-run the role.

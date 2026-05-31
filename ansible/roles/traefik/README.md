@@ -61,3 +61,8 @@ ansible-playbook ansible/site.yml --tags traefik
 **HTTP redirect:** Traefik automatically redirects all HTTP traffic to HTTPS via the `web` entrypoint configuration.
 
 **New services** are exposed by adding `traefik.enable=true` and the relevant router/service labels to a container on the `proxy` network — no Traefik config changes needed.
+
+**Observability.** Traefik is fully instrumented:
+- *Metrics*: Prometheus endpoint on `:8082`, scraped by the monitoring stack. Per-router, per-service, and per-entrypoint labels are enabled.
+- *Access logs*: Structured JSON format with a 100-entry write buffer. The `traceID` field in each log entry links to the corresponding trace in Tempo via Grafana's Loki derived fields.
+- *Tracing*: OTLP traces sent to Tempo via gRPC (`tempo:4317`). Tempo must be running (monitoring role) and on the `proxy` network before Traefik is restarted, otherwise it retries silently.

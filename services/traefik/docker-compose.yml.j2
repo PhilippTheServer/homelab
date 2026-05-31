@@ -31,11 +31,21 @@ services:
       - --certificatesresolvers.letsencrypt.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory
 {% endif %}
       - --log.level=INFO
+      # Structured JSON access logs — traceID field links to Tempo in Grafana
       - --accesslog=true
+      - --accesslog.format=json
+      - --accesslog.bufferingsize=100
       # Prometheus metrics endpoint (internal, scraped by monitoring stack)
       - --metrics.prometheus=true
       - --entrypoints.metrics.address=:8082
       - --metrics.prometheus.entryPoint=metrics
+      - --metrics.prometheus.addRoutersLabels=true
+      - --metrics.prometheus.addServicesLabels=true
+      - --metrics.prometheus.addEntryPointsLabels=true
+      # OTLP tracing → Tempo (reachable via proxy network)
+      - --tracing.serviceName=traefik
+      - --tracing.otlp.grpc.endpoint=tempo:4317
+      - --tracing.otlp.grpc.insecure=true
     environment:
       NAMECHEAP_API_USER: "{{ vault_namecheap_api_user }}"
       NAMECHEAP_API_KEY: "{{ vault_namecheap_api_key }}"

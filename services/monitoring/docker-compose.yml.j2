@@ -40,6 +40,18 @@ services:
       - "traefik.http.services.grafana.loadbalancer.server.port=3000"
       - "traefik.docker.network=proxy"
 
+  tempo:
+    image: grafana/tempo:{{ tempo_version }}
+    container_name: tempo
+    restart: unless-stopped
+    command: -config.file=/etc/tempo/tempo.yml
+    volumes:
+      - {{ homelab_base_dir }}/services/monitoring/tempo/tempo.yml:/etc/tempo/tempo.yml:ro
+      - tempo_data:/var/tempo
+    networks:
+      - proxy
+      - internal
+
   prometheus:
     image: prom/prometheus:{{ prometheus_version }}
     container_name: prometheus
@@ -49,6 +61,7 @@ services:
       - --storage.tsdb.path=/prometheus
       - --storage.tsdb.retention.time=30d
       - --web.enable-lifecycle
+      - --web.enable-remote-write-receiver
     volumes:
       - {{ homelab_base_dir }}/services/monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
@@ -125,3 +138,5 @@ volumes:
     name: prometheus_data
   loki_data:
     name: loki_data
+  tempo_data:
+    name: tempo_data

@@ -14,6 +14,7 @@
     - "{{ homelab_base_dir }}/services/monitoring/prometheus"
     - "{{ homelab_base_dir }}/services/monitoring/loki"
     - "{{ homelab_base_dir }}/services/monitoring/promtail"
+    - "{{ homelab_base_dir }}/services/monitoring/tempo"
 
 - name: Render docker-compose.yml
   template:
@@ -51,6 +52,15 @@
     mode: '0644'
   notify: restart monitoring
 
+- name: Render tempo.yml
+  template:
+    src: "{{ playbook_dir }}/../services/monitoring/tempo/tempo.yml.j2"
+    dest: "{{ homelab_base_dir }}/services/monitoring/tempo/tempo.yml"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: '0644'
+  notify: restart monitoring
+
 - name: Render Grafana datasources provisioning
   template:
     src: "{{ playbook_dir }}/../services/monitoring/grafana/provisioning/datasources/datasources.yml.j2"
@@ -83,6 +93,32 @@
     dest: "{{ homelab_base_dir }}/services/monitoring/grafana/dashboards/node-exporter-full.json"
     mode: '0644'
     force: false
+
+- name: Download Traefik v3 dashboard
+  get_url:
+    url: "https://grafana.com/api/dashboards/17346/revisions/latest/download"
+    dest: "{{ homelab_base_dir }}/services/monitoring/grafana/dashboards/traefik.json"
+    mode: '0644'
+    force: false
+
+- name: Download Traefik Loki dashboard
+  get_url:
+    url: "https://grafana.com/api/dashboards/13713/revisions/latest/download"
+    dest: "{{ homelab_base_dir }}/services/monitoring/grafana/dashboards/traefik-loki.json"
+    mode: '0644'
+    force: false
+
+- name: Fix Traefik Loki dashboard datasource placeholder
+  replace:
+    path: "{{ homelab_base_dir }}/services/monitoring/grafana/dashboards/traefik-loki.json"
+    regexp: '\$\{DS_LOKI\}'
+    replace: 'loki'
+
+- name: Fix Traefik Loki dashboard job selector (file path → Docker label)
+  replace:
+    path: "{{ homelab_base_dir }}/services/monitoring/grafana/dashboards/traefik-loki.json"
+    regexp: '/var/log/traefik\.log'
+    replace: 'traefik'
 
 - name: Ensure monitoring stack is running
   command:

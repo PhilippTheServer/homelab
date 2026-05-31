@@ -25,6 +25,24 @@ scrape_configs:
         target_label: image
     pipeline_stages:
       - match:
+          selector: '{container="traefik"}'
+          stages:
+            # Set job="traefik" so dashboard 13713 queries match
+            - static_labels:
+                job: traefik
+            # Parse JSON access log fields — dashboard uses | json in LogQL queries
+            - json:
+                expressions:
+                  status: DownstreamStatus
+                  method: RequestMethod
+            - labels:
+                status:
+                method:
+            # Drop internal dashboard health polling noise
+            - drop:
+                expression: '"RouterName":"traefik-dashboard@docker"'
+
+      - match:
           selector: '{container="gitlab"}'
           stages:
             # Drop INFO-level structured logs (sidekiq jobs, rails requests, workhorse access)
