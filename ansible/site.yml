@@ -19,6 +19,9 @@
     - role: headscale
       tags: [headscale]
 
+    - role: tailscale-client
+      tags: [tailscale-client]
+
     - role: hcvault
       tags: [hcvault]
 

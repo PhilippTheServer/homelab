@@ -1,0 +1,17 @@
+---
+- name: Check if tailscale is already installed
+  ansible.builtin.command: which tailscale
+  register: tailscale_installed
+  changed_when: false
+  failed_when: false
+
+- name: Install tailscale via official install script
+  ansible.builtin.shell:
+    cmd: curl -fsSL https://tailscale.com/install.sh | sh
+  when: tailscale_installed.rc != 0
+
+- name: Enable and start tailscaled
+  ansible.builtin.systemd:
+    name: tailscaled
+    enabled: true
+    state: started

@@ -268,6 +268,38 @@ vault kv patch secret/ansible headplane_api_key="<key-from-above>"
 ansible-playbook ansible/site.yml --tags headscale
 ```
 
+**Tailscale subnet router** (after Headscale is running):
+
+Install the Tailscale client on the Mini PC:
+
+```bash
+ansible-playbook ansible/site.yml --tags tailscale-client
+```
+
+Then SSH into the Mini PC and authenticate manually:
+
+```bash
+tailscale up --login-server=https://vpn.philippthesurfer.com \
+             --advertise-routes=192.168.178.0/24 \
+             --hostname=minipc
+# Opens a URL — visit it on any device and log in with your Keycloak account
+```
+
+Approve the advertised subnet route:
+
+```bash
+docker exec -it headscale headscale routes list
+docker exec -it headscale headscale routes enable -r <route-id>
+```
+
+On any remote device that should reach internal services over VPN:
+
+```bash
+tailscale up --accept-routes
+```
+
+---
+
 **GitLab API token** (after GitLab is running):
 
 Log in to GitLab → User Settings → Access Tokens → create a token with `api` scope. Store it in Vault:
