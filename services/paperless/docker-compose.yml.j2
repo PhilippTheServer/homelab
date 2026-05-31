@@ -31,9 +31,9 @@ services:
       PAPERLESS_ADMIN_PASSWORD: "{{ vault_paperless_admin_password }}"
       PAPERLESS_ADMIN_MAIL: "{{ traefik_acme_email }}"
       # OIDC via Keycloak
-      PAPERLESS_SOCIAL_ACCOUNT_ALLOW_SIGNUPS: "false"
-      PAPERLESS_SOCIALACCOUNT_PROVIDERS: >-
-        {"openid_connect": {"APPS": [{"provider_id": "keycloak", "name": "Keycloak", "client_id": "paperless", "secret": "{{ vault_paperless_oidc_secret }}", "settings": {"server_url": "https://auth.{{ domain }}/realms/homelab"}}], "OAUTH_PKCE_ENABLED": true}}
+      PAPERLESS_APPS: allauth.socialaccount.providers.openid_connect
+      PAPERLESS_SOCIALACCOUNT_ALLOW_SIGNUPS: "false"
+      PAPERLESS_SOCIALACCOUNT_PROVIDERS: '{"openid_connect": {"APPS": [{"provider_id": "keycloak", "name": "Keycloak", "client_id": "paperless", "secret": "{{ vault_paperless_oidc_secret }}", "settings": {"server_url": "https://auth.{{ domain }}/realms/homelab"}}], "OAUTH_PKCE_ENABLED": true}}'
     volumes:
       - paperless_data:/usr/src/paperless/data
       - paperless_media:/usr/src/paperless/media
@@ -60,7 +60,7 @@ services:
       POSTGRES_USER: paperless
       POSTGRES_PASSWORD: "{{ vault_paperless_db_password }}"
     volumes:
-      - paperless_db:/var/lib/postgresql/data
+      - paperless_db:/var/lib/postgresql
     networks:
       - internal
     healthcheck:
@@ -94,7 +94,7 @@ services:
       - internal
 
   tika:
-    image: ghcr.io/paperless-ngx/tika:latest
+    image: apache/tika:latest
     container_name: paperless-tika
     restart: unless-stopped
     networks:

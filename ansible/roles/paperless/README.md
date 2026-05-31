@@ -20,7 +20,7 @@ Paperless-ngx ingests, OCRs, tags, and archives scanned documents and PDFs. Docu
 | `paperless-db` | `postgres:18-alpine` | Document index and metadata |
 | `paperless-redis` | `redis:7-alpine` | Task queue for async processing |
 | `paperless-gotenberg` | `gotenberg/gotenberg:8` | Office document → PDF conversion |
-| `paperless-tika` | `ghcr.io/paperless-ngx/tika:latest` | File content extraction |
+| `paperless-tika` | `apache/tika:latest` | File content extraction |
 
 Networks: `paperless` joins `proxy` (Traefik) and `paperless_internal` (database, Redis, Gotenberg, Tika). The backing services are not externally routable.
 
