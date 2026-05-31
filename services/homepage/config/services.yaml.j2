@@ -1,21 +1,4 @@
 ---
-- Infrastructure:
-    - Traefik:
-        href: "https://traefik.{{ internal_subdomain }}.{{ domain }}"
-        description: Reverse Proxy & Load Balancer
-        icon: traefik.png
-
-    - Pi-hole:
-        href: "http://{{ minipc_ip }}:8080/admin"
-        description: Network-wide Ad Blocker & DNS
-        icon: pi-hole.png
-        widget:
-          type: pihole
-          url: "http://{{ minipc_ip }}:8080"
-          version: 6
-          key: "{{ vault_pihole_webpassword }}"
-
-
 - Security & Identity:
     - Keycloak:
         href: "https://auth.{{ domain }}"
@@ -69,3 +52,18 @@
         href: "https://headscale.{{ internal_subdomain }}.{{ domain }}/admin"
         description: Headscale Admin UI
         icon: mdi-vpn
+
+    - Traefik:
+        href: "https://traefik.{{ internal_subdomain }}.{{ domain }}"
+        description: Reverse Proxy & Load Balancer
+        icon: traefik.png
+
+    - Pi-hole:
+        href: "http://{{ minipc_ip }}:8080/admin"
+        description: Network-wide Ad Blocker & DNS
+        icon: pi-hole.png
+        widget:
+          type: pihole
+          url: "http://{{ minipc_ip }}:8080"
+          version: 6
+          key: "{{ vault_pihole_webpassword }}"
