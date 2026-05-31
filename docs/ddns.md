@@ -6,6 +6,8 @@ How `vpn.philippthesurfer.com` is kept reachable from the internet despite a dyn
 
 ## Architecture
 
+### Public services (`vpn.`, `auth.`)
+
 ```
 External client
     │ HTTPS (443)
@@ -22,6 +24,23 @@ headscale:8080 (Docker proxy network)
 
 No reverse proxy or tunnel sits between the client and the server.
 Traefik terminates TLS directly; the public IP is the home router's WAN address.
+
+### Internal services (`*.home.philippthesurfer.com`) — remote access via VPN
+
+```
+Remote client (connected to Headscale VPN)
+    │ DNS query for *.home.philippthesurfer.com
+    ▼
+Headscale split DNS → nameserver 192.168.178.20 (Pi-hole on home LAN)
+    │ resolves *.home.philippthesurfer.com → 192.168.178.20
+    ▼
+Tailscale subnet route: 192.168.178.0/24 advertised by minipc node
+    │ routes traffic through VPN tunnel to home LAN
+    ▼
+Traefik (192.168.178.20:443)  →  internal service
+```
+
+The Mini PC runs the Tailscale client (`tailscale-client` role) and advertises `192.168.178.0/24` as a subnet route. Remote devices must have `--accept-routes` enabled to use it. Without the subnet route, the split DNS nameserver (`192.168.178.20`) is unreachable from outside and `*.home.philippthesurfer.com` does not resolve.
 
 ---
 
