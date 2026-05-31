@@ -9,6 +9,16 @@
   loop:
     - "{{ homelab_base_dir }}/services/homepage"
     - "{{ homelab_base_dir }}/services/homepage/config"
+    - "{{ homelab_base_dir }}/services/homepage/images"
+
+- name: Download background wallpaper
+  get_url:
+    url: https://wallpapercave.com/wp/wp8982796.jpg
+    dest: "{{ homelab_base_dir }}/services/homepage/images/background.jpg"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: '0640'
+    force: false
 
 - name: Render settings.yaml
   template:

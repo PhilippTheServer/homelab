@@ -16,6 +16,7 @@ services:
       HOMEPAGE_ALLOWED_HOSTS: "dash.{{ internal_subdomain }}.{{ domain }}"
     volumes:
       - {{ homelab_base_dir }}/services/homepage/config:/app/config
+      - {{ homelab_base_dir }}/services/homepage/images:/app/public/images
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
       - proxy
