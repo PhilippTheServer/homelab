@@ -2,7 +2,7 @@
 # ── Prerequisites ──────────────────────────────────────────────────────────────
 - name: Install apt prerequisites
   apt:
-    name: [ca-certificates, curl, gnupg, ufw, python3-pip]
+    name: [ca-certificates, curl, gnupg, python3-pip]
     state: present
     update_cache: true
 
@@ -51,52 +51,6 @@
     name: "{{ deploy_user }}"
     groups: docker
     append: true
-
-# ── Firewall ───────────────────────────────────────────────────────────────────
-- name: Set UFW default incoming policy to deny
-  ufw:
-    direction: incoming
-    policy: deny
-
-- name: Set UFW default outgoing policy to allow
-  ufw:
-    direction: outgoing
-    policy: allow
-
-- name: Allow SSH
-  ufw:
-    rule: allow
-    port: '22'
-    proto: tcp
-
-- name: Allow HTTP (Traefik)
-  ufw:
-    rule: allow
-    port: '80'
-    proto: tcp
-
-- name: Allow HTTPS (Traefik)
-  ufw:
-    rule: allow
-    port: '443'
-    proto: tcp
-
-- name: Allow DNS TCP (Pi-hole)
-  ufw:
-    rule: allow
-    port: '53'
-    proto: tcp
-
-- name: Allow DNS UDP (Pi-hole)
-  ufw:
-    rule: allow
-    port: '53'
-    proto: udp
-
-- name: Enable UFW
-  ufw:
-    state: enabled
-    logging: 'on'
 
 # ── Directory structure ────────────────────────────────────────────────────────
 - name: Create homelab base directory

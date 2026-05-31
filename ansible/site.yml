@@ -7,6 +7,9 @@
 #    - role: common
 #      tags: [common]
 
+    - role: ufw
+      tags: [ufw]
+
     - role: docker-log-limit
       tags: [docker-log-limit]
 

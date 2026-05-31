@@ -159,7 +159,7 @@ Each stack is an independent Docker Compose file with its own database.
 
 | Layer | Tool | Purpose |
 |---|---|---|
-| Host provisioning | Ansible | Docker, UFW, system users, directories |
+| Host provisioning | Ansible | Docker, firewall, system users, directories |
 | Secrets | HashiCorp Vault | All credentials in Vault KV v2 (`secret/ansible`); fetched at runtime via `community.hashi_vault` — nothing sensitive in the repo |
 | Service deployment | Docker Compose (Jinja2 templates) | Ansible renders and deploys each stack |
 | CI/CD | GitLab CI | Re-deploys stacks after bootstrap; authenticates to Vault via AppRole |
@@ -173,7 +173,8 @@ homelab/
 │   ├── group_vars/all/
 │   │   └── vars.yml          # domain, IPs, service versions, HCVault lookups
 │   ├── roles/
-│   │   ├── common/           # Docker, UFW, deploy user
+│   │   ├── common/           # Docker, deploy user, shared network
+│   │   ├── ufw/              # UFW firewall rules
 │   │   ├── docker-log-limit/ # Docker daemon log rotation
 │   │   ├── traefik/          # reverse proxy + SSL + ddclient DDNS
 │   │   ├── keycloak/
@@ -211,7 +212,8 @@ homelab/
 ### Bootstrap Order
 
 ```
-common            → Docker, UFW, system users
+common            → Docker, system users, shared proxy network
+ufw               → host firewall (deny-all + explicit allow rules)
 docker-log-limit  → daemon log rotation (5 MB per container)
 traefik           → SSL + DDNS (infrastructure prerequisite)
 keycloak    → SSO (configure realm + OIDC clients before continuing)
