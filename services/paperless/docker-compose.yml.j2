@@ -32,6 +32,8 @@ services:
       PAPERLESS_ADMIN_MAIL: "{{ traefik_acme_email }}"
       # OIDC via Keycloak
       PAPERLESS_APPS: allauth.socialaccount.providers.openid_connect
+      PAPERLESS_DISABLE_REGULAR_LOGIN: "true"
+      PAPERLESS_REDIRECT_LOGIN_TO_SSO: "true"
       PAPERLESS_SOCIALACCOUNT_ALLOW_SIGNUPS: "false"
       PAPERLESS_SOCIALACCOUNT_PROVIDERS: '{"openid_connect": {"APPS": [{"provider_id": "keycloak", "name": "Keycloak", "client_id": "paperless", "secret": "{{ vault_paperless_oidc_secret }}", "settings": {"server_url": "https://auth.{{ domain }}/realms/homelab"}}], "OAUTH_PKCE_ENABLED": true}}'
     volumes:
