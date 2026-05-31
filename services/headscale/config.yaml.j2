@@ -61,8 +61,8 @@ oidc:
   issuer: "https://auth.{{ domain }}/realms/homelab"
   client_id: headscale
   client_secret: "{{ vault_headscale_oidc_secret }}"
-  expiry: 24h
-  use_expiry_from_token: true
+  expiry: 0
+  use_expiry_from_token: false
   scope:
     - openid
     - profile
