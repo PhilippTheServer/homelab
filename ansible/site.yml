@@ -40,5 +40,8 @@
     - role: homepage
       tags: [homepage]
 
+    - role: paperless
+      tags: [paperless]
+
     - role: monitoring
       tags: [monitoring]

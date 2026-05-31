@@ -28,6 +28,7 @@ graph TD
         GL["GitLab CE\nGit · CI/CD\n+ Postgres + Redis"]
         HB["Harbor\nDocker Registry\n+ Postgres + Redis"]
         HP["Homepage\nDashboard"]
+        PL["Paperless-ngx\nDocument Management\n+ Postgres + Redis"]
         MON["Monitoring\nGrafana · Prometheus · Loki"]
     end
 
@@ -56,7 +57,7 @@ graph TD
     V1 & V2 -->|"Tailscale/Headscale\nVPN mesh"| HS
     V1 & V2 -->|"HTTPS via VPN"| Traefik
 
-    Traefik --> KC & HS & HCV & VW & GL & HB & PH & HP & MON
+    Traefik --> KC & HS & HCV & VW & GL & HB & PH & HP & PL & MON
 ```
 
 ---
@@ -138,6 +139,13 @@ Each stack is an independent Docker Compose file with its own database.
 - **Auth:** OIDC via Keycloak
 - **Compose:** `services/homepage/docker-compose.yml`
 
+### Paperless-ngx (Priority 4)
+- **Role:** Document management — ingest, OCR, tag, and search scanned documents and PDFs
+- **Auth:** OIDC via Keycloak; local signups disabled
+- **OCR:** German + English; Office documents (docx, xlsx, odt) converted to PDF via Gotenberg/Tika before OCR
+- **Database:** Dedicated Postgres + Redis containers in the same stack
+- **Compose:** `services/paperless/docker-compose.yml`
+
 ### Monitoring (Priority 4)
 - **Role:** Observability stack — host + container metrics and log aggregation
 - **Components:** Grafana (UI), Prometheus (metrics), Loki (logs), Promtail (Docker log shipper), Node Exporter (host metrics), cAdvisor (container metrics)
@@ -176,6 +184,7 @@ homelab/
 │   │   ├── gitlab/
 │   │   ├── harbor/
 │   │   ├── homepage/
+│   │   ├── paperless/
 │   │   └── monitoring/
 │   └── site.yml
 ├── services/
@@ -188,6 +197,7 @@ homelab/
 │   ├── gitlab/
 │   ├── harbor/
 │   ├── homepage/
+│   ├── paperless/
 │   └── monitoring/
 ├── docs/
 │   ├── architecture.md       # this file
@@ -212,6 +222,7 @@ pihole      → DNS + DHCP
 gitlab      → push this repo to GitLab; CI takes over re-deploys
 harbor      → registry
 homepage    → dashboard
+paperless   → document management
 monitoring  → metrics + logs
 ```
 

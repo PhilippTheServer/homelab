@@ -4,7 +4,7 @@ SSO / OIDC identity provider — all services authenticate here.
 
 ## Overview
 
-Keycloak is the central authentication hub for the homelab. Every service that supports OIDC (Vaultwarden, GitLab, Harbor, HashiCorp Vault, Headscale, Homepage) is configured as a client in the `homelab` realm. A realm export JSON is rendered by Ansible and imported automatically on first container startup via the `--import-realm` flag, so OIDC clients and realm settings are declared as code. Keycloak's database is an isolated Postgres container on an internal-only network.
+Keycloak is the central authentication hub for the homelab. Every service that supports OIDC (Vaultwarden, GitLab, Harbor, HashiCorp Vault, Headscale, Homepage, Paperless-ngx) is configured as a client in the `homelab` realm. A realm export JSON is rendered by Ansible and imported automatically on first container startup via the `--import-realm` flag, so OIDC clients and realm settings are declared as code. Keycloak's database is an isolated Postgres container on an internal-only network.
 
 ## Prerequisites
 

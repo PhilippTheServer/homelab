@@ -39,6 +39,7 @@ Infrastructure must be bootstrapped in dependency order.
 [priority 4]      gitlab      → Push this repo here; CI takes over re-deploys
 [priority 4]      harbor      → Registry
 [priority 4]      homepage    → Dashboard
+[priority 4]      paperless   → Document management
 [priority 4]      monitoring  → Metrics + log aggregation
 ```
 
@@ -199,7 +200,12 @@ vault kv put secret/ansible \
   homepage_oidc_secret="PLACEHOLDER" \
   homepage_nextauth_secret="..." \
   grafana_admin_password="$(openssl rand -base64 32)" \
-  grafana_oidc_secret="PLACEHOLDER"
+  grafana_oidc_secret="PLACEHOLDER" \
+  paperless_db_password="$(openssl rand -base64 32)" \
+  paperless_secret_key="$(openssl rand -base64 50)" \
+  paperless_admin_password="$(openssl rand -base64 32)" \
+  paperless_oidc_secret="PLACEHOLDER" \
+  paperless_api_token="PLACEHOLDER"
 ```
 
 Fields marked `PLACEHOLDER` are filled in during post-deploy wiring steps below.
@@ -244,7 +250,8 @@ vault kv patch secret/ansible \
   harbor_oidc_secret="..." \
   vaultwarden_oidc_secret="..." \
   homepage_oidc_secret="..." \
-  grafana_oidc_secret="..."
+  grafana_oidc_secret="..." \
+  paperless_oidc_secret="..."
 ```
 
 4. Re-run the affected roles to apply SSO config.

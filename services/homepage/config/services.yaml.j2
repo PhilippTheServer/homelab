@@ -1,4 +1,14 @@
 ---
+- Documents:
+    - Paperless-ngx:
+        href: "https://paper.{{ internal_subdomain }}.{{ domain }}"
+        description: Document Management & OCR
+        icon: paperless-ngx.png
+        widget:
+          type: paperlessngx
+          url: "http://paperless:8000"
+          key: "{{ vault_paperless_api_token }}"
+
 - Security & Identity:
     - Keycloak:
         href: "https://auth.{{ domain }}"

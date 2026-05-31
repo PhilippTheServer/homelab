@@ -29,6 +29,7 @@ prometheus_version: "v2.54.1"
 loki_version: "3.2.1"
 node_exporter_version: "v1.8.2"
 cadvisor_version: "v0.49.1"
+paperless_version: "2.20"
 
 # ── Secrets (fetched from HashiCorp Vault at runtime) ──────────────────────────
 # Requires VAULT_TOKEN in the environment before running any playbook.
@@ -63,3 +64,8 @@ vault_homepage_oidc_secret:     "{{ _vault_secrets.homepage_oidc_secret }}"
 vault_homepage_nextauth_secret: "{{ _vault_secrets.homepage_nextauth_secret }}"
 vault_grafana_admin_password:   "{{ _vault_secrets.grafana_admin_password }}"
 vault_grafana_oidc_secret:      "{{ _vault_secrets.grafana_oidc_secret }}"
+vault_paperless_db_password:    "{{ _vault_secrets.paperless_db_password }}"
+vault_paperless_secret_key:     "{{ _vault_secrets.paperless_secret_key }}"
+vault_paperless_admin_password: "{{ _vault_secrets.paperless_admin_password }}"
+vault_paperless_oidc_secret:    "{{ _vault_secrets.paperless_oidc_secret }}"
+vault_paperless_api_token:      "{{ _vault_secrets.paperless_api_token }}"
