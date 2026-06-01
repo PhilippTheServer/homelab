@@ -29,6 +29,7 @@ graph TD
         HB["Harbor\nDocker Registry\n+ Postgres + Redis"]
         HP["Homepage\nDashboard"]
         PL["Paperless-ngx\nDocument Management\n+ Postgres + Redis"]
+        JF["Jellyfin\nMedia Server"]
         MON["Monitoring\nGrafana · Prometheus · Loki"]
     end
 
@@ -57,7 +58,7 @@ graph TD
     V1 & V2 -->|"Tailscale/Headscale\nVPN mesh"| HS
     V1 & V2 -->|"HTTPS via VPN"| Traefik
 
-    Traefik --> KC & HS & HCV & VW & GL & HB & PH & HP & PL & MON
+    Traefik --> KC & HS & HCV & VW & GL & HB & PH & HP & PL & JF & MON
 ```
 
 ---
@@ -146,6 +147,13 @@ Each stack is an independent Docker Compose file with its own database.
 - **Database:** Dedicated Postgres + Redis containers in the same stack
 - **Compose:** `services/paperless/docker-compose.yml`
 
+### Jellyfin (Priority 4)
+- **Role:** Media server — stream locally stored movies, TV shows, and music to any device
+- **Auth:** Local accounts by default; OIDC via Keycloak available post-deploy via the SSO plugin
+- **Database:** Internal SQLite (no external Postgres or Redis)
+- **Media:** Read-only bind mount from `/opt/homelab/media` on the host
+- **Compose:** `services/jellyfin/docker-compose.yml`
+
 ### Monitoring (Priority 4)
 - **Role:** Observability stack — host + container metrics and log aggregation
 - **Components:** Grafana (UI), Prometheus (metrics), Loki (logs), Promtail (Docker log shipper), Node Exporter (host metrics), cAdvisor (container metrics)
@@ -186,6 +194,7 @@ homelab/
 │   │   ├── harbor/
 │   │   ├── homepage/
 │   │   ├── paperless/
+│   │   ├── jellyfin/
 │   │   └── monitoring/
 │   └── site.yml
 ├── services/
@@ -199,6 +208,7 @@ homelab/
 │   ├── harbor/
 │   ├── homepage/
 │   ├── paperless/
+│   ├── jellyfin/
 │   └── monitoring/
 ├── docs/
 │   ├── architecture.md       # this file
@@ -225,6 +235,7 @@ gitlab      → push this repo to GitLab; CI takes over re-deploys
 harbor      → registry
 homepage    → dashboard
 paperless   → document management
+jellyfin    → media server
 monitoring  → metrics + logs
 ```
 

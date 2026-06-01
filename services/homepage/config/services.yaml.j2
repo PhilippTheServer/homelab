@@ -1,4 +1,16 @@
 ---
+- Media:
+    - Jellyfin:
+        href: "https://media.{{ internal_subdomain }}.{{ domain }}"
+        description: Media Server
+        icon: jellyfin.png
+        widget:
+          type: jellyfin
+          url: "http://jellyfin:8096"
+          key: "{{ vault_jellyfin_api_key }}"
+          enableBlocks: true
+          enableNowPlaying: true
+
 - Documents:
     - Paperless-ngx:
         href: "https://paper.{{ internal_subdomain }}.{{ domain }}"

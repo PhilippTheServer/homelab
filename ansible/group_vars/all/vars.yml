@@ -31,6 +31,7 @@ tempo_version: "2.6.1"
 node_exporter_version: "v1.8.2"
 cadvisor_version: "v0.49.1"
 paperless_version: "2.20"
+jellyfin_version: "latest"
 
 # ── Secrets (fetched from HashiCorp Vault at runtime) ──────────────────────────
 # Requires VAULT_TOKEN in the environment before running any playbook.
@@ -70,3 +71,5 @@ vault_paperless_secret_key:     "{{ _vault_secrets.paperless_secret_key }}"
 vault_paperless_admin_password: "{{ _vault_secrets.paperless_admin_password }}"
 vault_paperless_oidc_secret:    "{{ _vault_secrets.paperless_oidc_secret }}"
 vault_paperless_api_token:      "{{ _vault_secrets.paperless_api_token }}"
+vault_jellyfin_oidc_secret:     "{{ _vault_secrets.jellyfin_oidc_secret }}"
+vault_jellyfin_api_key:         "{{ _vault_secrets.jellyfin_api_key }}"

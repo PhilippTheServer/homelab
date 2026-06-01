@@ -40,6 +40,7 @@ Infrastructure must be bootstrapped in dependency order.
 [priority 4]      harbor      → Registry
 [priority 4]      homepage    → Dashboard
 [priority 4]      paperless   → Document management
+[priority 4]      jellyfin    → Media server
 [priority 4]      monitoring  → Metrics + log aggregation
 ```
 
@@ -82,9 +83,9 @@ ansible-playbook ansible/site.yml -i ansible/inventory/hosts.yml \
 ansible-playbook ansible/site.yml -i ansible/inventory/hosts.yml \
   --tags pihole
 
-# 8. GitLab + Harbor + Homepage + Monitoring
+# 8. GitLab + Harbor + Homepage + Paperless + Jellyfin + Monitoring
 ansible-playbook ansible/site.yml -i ansible/inventory/hosts.yml \
-  --tags gitlab,harbor,homepage,monitoring
+  --tags gitlab,harbor,homepage,paperless,jellyfin,monitoring
 ```
 
 </details>
@@ -205,7 +206,9 @@ vault kv put secret/ansible \
   paperless_secret_key="$(openssl rand -base64 50)" \
   paperless_admin_password="$(openssl rand -base64 32)" \
   paperless_oidc_secret="PLACEHOLDER" \
-  paperless_api_token="PLACEHOLDER"
+  paperless_api_token="PLACEHOLDER" \
+  jellyfin_oidc_secret="PLACEHOLDER" \
+  jellyfin_api_key="PLACEHOLDER"
 ```
 
 Fields marked `PLACEHOLDER` are filled in during post-deploy wiring steps below.
@@ -251,7 +254,8 @@ vault kv patch secret/ansible \
   vaultwarden_oidc_secret="..." \
   homepage_oidc_secret="..." \
   grafana_oidc_secret="..." \
-  paperless_oidc_secret="..."
+  paperless_oidc_secret="..." \
+  jellyfin_oidc_secret="..."
 ```
 
 4. Re-run the affected roles to apply SSO config.

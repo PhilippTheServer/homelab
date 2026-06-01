@@ -1,0 +1,27 @@
+---
+- name: Create jellyfin directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: '0750'
+  loop:
+    - "{{ homelab_base_dir }}/services/jellyfin"
+    - "{{ homelab_base_dir }}/media"
+
+- name: Render docker-compose.yml
+  template:
+    src: "{{ playbook_dir }}/../services/jellyfin/docker-compose.yml.j2"
+    dest: "{{ homelab_base_dir }}/services/jellyfin/docker-compose.yml"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: '0640'
+  notify: restart jellyfin
+
+- name: Ensure jellyfin stack is running
+  command:
+    cmd: docker compose up -d --remove-orphans
+    chdir: "{{ homelab_base_dir }}/services/jellyfin"
+  become_user: "{{ deploy_user }}"
+  changed_when: false
