@@ -78,8 +78,8 @@ Run three times with three different keys. Long-term, configure auto-unseal with
 
 ```bash
 vault login -method=oidc
-SIGNED=$(vault write -field=signed_key ssh/sign/user public_key="$(cat ~/.ssh/vault.pub)")
-echo "$SIGNED" > ~/.ssh/vault-signed.pub
+SIGNED=$(vault write -field=signed_key ssh/sign/user public_key="$(cat ~/.ssh/hcvault.pub)")
+echo "$SIGNED" > ~/.ssh/hcvault-cert.pub
 ssh minipc.home.philippthesurfer.com
 ```
 

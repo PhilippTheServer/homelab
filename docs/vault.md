@@ -119,15 +119,17 @@ Instead of distributing static authorized keys, Vault acts as an SSH CA. You gen
 
 ```bash
 # 1. Generate a dedicated SSH key pair for Vault-signed access
-ssh-keygen -t ed25519 -f ~/.ssh/vault -C "vault-ssh" -N ""
+ssh-keygen -t ed25519 -f ~/.ssh/hcvault -C "vault-ssh" -N ""
 
 # 2. Add to ~/.ssh/config so SSH knows to use the signed cert for homelab hosts
 cat >> ~/.ssh/config << 'EOF'
 
-Host *.home.philippthesurfer.com
+Host *.philippthesurfer.com
     User philipp
-    IdentityFile ~/.ssh/vault
-    CertificateFile ~/.ssh/vault-signed.pub
+    IdentityFile ~/.ssh/hcvault
+    CertificateFile ~/.ssh/hcvault-cert.pub
+    IdentitiesOnly yes
+    Port 1461
 EOF
 ```
 
@@ -137,8 +139,8 @@ EOF
 export VAULT_ADDR=https://vault.home.philippthesurfer.com
 vault login -method=oidc
 vault write -field=signed_key ssh/sign/user \
-  public_key="$(cat ~/.ssh/vault.pub)" > ~/.ssh/vault-signed.pub
-chmod 600 ~/.ssh/vault-signed.pub
+  public_key="$(cat ~/.ssh/hcvault.pub)" > ~/.ssh/hcvault-cert.pub
+chmod 600 ~/.ssh/hcvault-cert.pub
 ```
 
 **SSH in:**
@@ -156,14 +158,16 @@ The workflow is identical to macOS.
 **One-time setup:**
 
 ```bash
-ssh-keygen -t ed25519 -f ~/.ssh/vault -C "vault-ssh" -N ""
+ssh-keygen -t ed25519 -f ~/.ssh/hcvault -C "vault-ssh" -N ""
 
 cat >> ~/.ssh/config << 'EOF'
 
-Host *.home.philippthesurfer.com
+Host *.philippthesurfer.com
     User philipp
-    IdentityFile ~/.ssh/vault
-    CertificateFile ~/.ssh/vault-signed.pub
+    IdentityFile ~/.ssh/hcvault
+    CertificateFile ~/.ssh/hcvault-cert.pub
+    IdentitiesOnly yes
+    Port 1461
 EOF
 chmod 600 ~/.ssh/config
 ```
@@ -174,8 +178,8 @@ chmod 600 ~/.ssh/config
 export VAULT_ADDR=https://vault.home.philippthesurfer.com
 vault login -method=oidc
 vault write -field=signed_key ssh/sign/user \
-  public_key="$(cat ~/.ssh/vault.pub)" > ~/.ssh/vault-signed.pub
-chmod 600 ~/.ssh/vault-signed.pub
+  public_key="$(cat ~/.ssh/hcvault.pub)" > ~/.ssh/hcvault-cert.pub
+chmod 600 ~/.ssh/hcvault-cert.pub
 ```
 
 **Automate with a shell function** — add to `.bashrc`/`.zshrc`:
@@ -184,8 +188,8 @@ chmod 600 ~/.ssh/vault-signed.pub
 vault-ssh-refresh() {
   vault login -method=oidc
   vault write -field=signed_key ssh/sign/user \
-    public_key="$(cat ~/.ssh/vault.pub)" > ~/.ssh/vault-signed.pub
-  chmod 600 ~/.ssh/vault-signed.pub
+    public_key="$(cat ~/.ssh/hcvault.pub)" > ~/.ssh/hcvault-cert.pub
+  chmod 600 ~/.ssh/hcvault-cert.pub
   echo "SSH cert valid for 8h"
 }
 ```
@@ -202,7 +206,7 @@ Windows 10/11 ships with OpenSSH. The certificate workflow works natively — no
 
 ```powershell
 # 1. Generate SSH key pair
-ssh-keygen -t ed25519 -f "$env:USERPROFILE\.ssh\vault" -C "vault-ssh" -N '""'
+ssh-keygen -t ed25519 -f "$env:USERPROFILE\.ssh\hcvault" -C "vault-ssh" -N '""'
 
 # 2. Add to SSH config
 $sshConfig = "$env:USERPROFILE\.ssh\config"
@@ -210,10 +214,12 @@ if (-not (Test-Path $sshConfig)) { New-Item $sshConfig -Force }
 
 Add-Content $sshConfig @"
 
-Host *.home.philippthesurfer.com
+Host *.philippthesurfer.com
     User philipp
-    IdentityFile ~/.ssh/vault
-    CertificateFile ~/.ssh/vault-signed.pub
+    IdentityFile ~/.ssh/hcvault
+    CertificateFile ~/.ssh/hcvault-cert.pub
+    IdentitiesOnly yes
+    Port 1461
 "@
 ```
 
@@ -224,8 +230,8 @@ $env:VAULT_ADDR = "https://vault.home.philippthesurfer.com"
 vault login -method=oidc
 
 vault write -field=signed_key ssh/sign/user `
-  public_key=(Get-Content "$env:USERPROFILE\.ssh\vault.pub" -Raw).Trim() `
-  | Set-Content "$env:USERPROFILE\.ssh\vault-signed.pub"
+  public_key=(Get-Content "$env:USERPROFILE\.ssh\hcvault.pub" -Raw).Trim() `
+  | Set-Content "$env:USERPROFILE\.ssh\hcvault-cert.pub"
 ```
 
 **SSH in:**
@@ -254,7 +260,7 @@ vault login -method=oidc        # opens browser → Keycloak login → token sav
 
 # 2. Sign your SSH key (8h cert)
 vault write -field=signed_key ssh/sign/user \
-  public_key="$(cat ~/.ssh/vault.pub)" > ~/.ssh/vault-signed.pub
+  public_key="$(cat ~/.ssh/hcvault.pub)" > ~/.ssh/hcvault-cert.pub
 
 # 3. SSH into the mini PC
 ssh minipc.home.philippthesurfer.com
@@ -401,6 +407,10 @@ ansible-galaxy collection install -r ansible/requirements.yml
 export VAULT_ADDR=https://vault.home.philippthesurfer.com
 vault login -method=oidc     # sets ~/.vault-token; valid 8h
 
+# Sign your SSH key — Ansible connects to the hosts with this same cert
+vault write -field=signed_key ssh/sign/user \
+  public_key="$(cat ~/.ssh/hcvault.pub)" > ~/.ssh/hcvault-cert.pub
+
 # Run a playbook — no --ask-vault-pass, no secrets in the command
 ansible-playbook ansible/site.yml -i ansible/inventory/hosts.yml --tags traefik
 
@@ -408,7 +418,16 @@ ansible-playbook ansible/site.yml -i ansible/inventory/hosts.yml --tags traefik
 ansible-playbook ansible/site.yml -i ansible/inventory/hosts.yml
 ```
 
-If you are already on the LAN the Vault URL resolves via Pi-hole. If you are remote, connect via Headscale VPN first.
+Ansible reaches the hosts over SSH using the **Vault-signed certificate**, not a
+static key. The inventory addresses hosts by name (e.g. `minipc.home.philippthesurfer.com`)
+on port `1461` as user `philipp`, and points SSH at `~/.ssh/hcvault` +
+`~/.ssh/hcvault-cert.pub` — so the [Daily SSH Workflow](#daily-ssh-workflow) cert
+must be signed first (it is the same cert). Adding a host to the inventory is all
+that is needed to manage it; the hosts trust the Vault CA, so no key distribution
+is required.
+
+If you are already on the LAN the Vault URL and host names resolve via Pi-hole. If
+you are remote, connect via Headscale VPN first.
 
 ### CI/CD via AppRole
 
@@ -474,7 +493,7 @@ environment:
 | Task | Command |
 |---|---|
 | Log in | `vault login -method=oidc` |
-| Sign SSH cert | `vault write -field=signed_key ssh/sign/user public_key="$(cat ~/.ssh/vault.pub)" > ~/.ssh/vault-signed.pub` |
+| Sign SSH cert | `vault write -field=signed_key ssh/sign/user public_key="$(cat ~/.ssh/hcvault.pub)" > ~/.ssh/hcvault-cert.pub` |
 | View all secrets | `vault kv get secret/ansible` |
 | Add/update a field | `vault kv patch secret/ansible key="value"` |
 | Get one field | `vault kv get -field=key secret/ansible` |
