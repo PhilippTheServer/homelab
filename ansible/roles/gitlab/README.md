@@ -16,7 +16,7 @@ GitLab CE provides the primary Git remote and CI/CD system for the homelab. Afte
 
 | Container | Image | Purpose |
 |---|---|---|
-| `gitlab` | `gitlab/gitlab-ce:19.0.0-ce.0` | GitLab application server |
+| `gitlab` | `gitlab/gitlab-ce:19.0.2-ce.0` | GitLab application server |
 | `gitlab-runner` | `gitlab/gitlab-runner:latest` | CI/CD job executor |
 
 ## Configuration
