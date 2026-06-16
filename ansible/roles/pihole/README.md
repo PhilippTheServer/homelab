@@ -15,7 +15,7 @@ Pi-hole provides DNS and DHCP for the local network, and is the mechanism by whi
 
 | Container | Image | Purpose |
 |---|---|---|
-| `pihole` | `pihole/pihole:2026.05.0` | DNS + DHCP + ad blocking |
+| `pihole` | `pihole/pihole:2026.06.0` | DNS + DHCP + ad blocking |
 
 Pi-hole runs with `network_mode: host`. It is not on the `proxy` Docker network and has no Traefik labels.
 
