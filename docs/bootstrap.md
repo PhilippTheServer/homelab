@@ -52,6 +52,10 @@ Infrastructure must be bootstrapped in dependency order.
 export VAULT_ADDR=https://vault.home.philippthesurfer.com
 vault login -method=oidc
 
+# Sign your SSH key — Ansible connects to the hosts with this Vault-signed cert
+vault write -field=signed_key ssh/sign/user \
+  public_key="$(cat ~/.ssh/hcvault.pub)" > ~/.ssh/hcvault-cert.pub
+
 # 0. Verify connectivity
 ansible minipc -m ping -i ansible/inventory/hosts.yml
 

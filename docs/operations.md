@@ -74,7 +74,7 @@ Vault-signed SSH cert is required. Cert is valid 8 hours.
 export VAULT_ADDR=https://vault.home.philippthesurfer.com
 vault login -method=oidc
 vault write -field=signed_key ssh/sign/user \
-  public_key="$(cat ~/.ssh/vault.pub)" > ~/.ssh/vault-signed.pub
+  public_key="$(cat ~/.ssh/hcvault.pub)" > ~/.ssh/hcvault-cert.pub
 
 # SSH in
 ssh minipc.home.philippthesurfer.com
