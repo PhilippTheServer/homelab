@@ -76,10 +76,20 @@ Each Ansible role also has its own README:
 
 ## Prerequisites
 
-On your **local machine** (where you run Ansible):
-- Ansible `>= 2.15` — `pip install ansible`
+On your **local machine** (where you run Ansible) — set up a project virtualenv
+from the repo root (where `ansible.cfg` lives):
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt                       # ansible-core + hvac<2
+.venv/bin/ansible-galaxy collection install -r ansible/requirements.yml
+source .venv/bin/activate
+```
+
 - HashiCorp Vault CLI — `brew install hashicorp/tap/vault`
-- SSH key added to the Mini PC's `~/.ssh/authorized_keys`
+- A Vault-signed SSH cert for the hosts (see [docs/vault.md](docs/vault.md)); the
+  Mini PC trusts the Vault SSH CA, so no static key in `~/.ssh/authorized_keys` is
+  needed once it is provisioned
 
 On the **Mini PC** (one-time manual steps before first Ansible run):
 

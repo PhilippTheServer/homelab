@@ -6,17 +6,30 @@ Step-by-step guide for the first deploy of the homelab. After bootstrap, GitLab 
 
 ## Prerequisites (control machine)
 
+Run everything from the **repo root** — `ansible.cfg` lives here and Ansible only
+reads it from the current directory (never from the playbook's folder).
+
 ```bash
 # macOS: prevent "A worker was found in a dead state" fork-safety crash
 export OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES  # add to ~/.zshrc to make permanent
 
-# Install hvac into Ansible's Python — required for community.hashi_vault lookups
-# Pin to 1.x: hvac 2.x changed response types, breaking community.hashi_vault 7.x lookups
-/opt/homebrew/Cellar/ansible/*/libexec/bin/python -m pip install "hvac"
+# Create a project virtualenv for the control node. ansible-core + the hvac
+# client (required by the community.hashi_vault lookups) go here — the system
+# Python is usually PEP 668 externally managed, so don't install globally.
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt          # ansible-core + hvac<2
 
-# Install Ansible collections
-ansible-galaxy collection install -r ansible/requirements.yml
+# Install the Ansible collections into the venv's reach
+.venv/bin/ansible-galaxy collection install -r ansible/requirements.yml
+
+# Activate it for the rest of your session (or prefix commands with .venv/bin/)
+source .venv/bin/activate
 ```
+
+> `requirements.txt` pins `hvac<2` on purpose — hvac 2.x changed response types
+> and breaks community.hashi_vault 7.x lookups. If `python3 -m venv` complains
+> that `ensurepip` is unavailable, install your distro's venv package first
+> (e.g. `apt install python3-venv`).
 
 ---
 
