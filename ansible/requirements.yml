@@ -1,4 +1,12 @@
 ---
 collections:
+  # Vault secrets lookup (group_vars/all/vars.yml)
   - name: community.hashi_vault
     version: ">=7.1.0,<8.0.0"
+  # `ufw` module (ufw role) — bundled with the full `ansible` package but NOT
+  # with ansible-core, which is what the control-node venv uses.
+  - name: community.general
+    version: ">=8.0.0,<14.0.0"
+  # `docker_network` module (traefik role)
+  - name: community.docker
+    version: ">=3.4.0,<6.0.0"
