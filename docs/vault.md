@@ -385,7 +385,7 @@ vault_namecheap_api_key:   "{{ _vault_secrets.namecheap_api_key }}"
 # ... (full list in vars.yml)
 ```
 
-The lookup URL and auth method are configured in `ansible/ansible.cfg`:
+The lookup URL and auth method are configured in `ansible.cfg` (at the repo root):
 
 ```ini
 [hashi_vault_collection]
@@ -399,8 +399,12 @@ auth_method = token
 
 ### Running playbooks
 
+Run these from the **repo root** with the control-node virtualenv active (it
+provides ansible-core **and** the `hvac` client the lookup needs — see
+[Bootstrap](bootstrap.md#prerequisites-control-machine)).
+
 ```bash
-# One-time: install the hashi_vault collection
+# One-time: install the hashi_vault collection (into the active venv's reach)
 ansible-galaxy collection install -r ansible/requirements.yml
 
 # Every session before running playbooks

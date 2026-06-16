@@ -1,0 +1,14 @@
+# Controller-side Python dependencies for the Ansible control node.
+# Install into a project virtualenv (the system Python is PEP 668 externally
+# managed, so install here rather than globally):
+#
+#   python3 -m venv .venv
+#   .venv/bin/pip install -r requirements.txt
+#   .venv/bin/ansible-galaxy collection install -r ansible/requirements.yml
+#
+# Then run playbooks from the repo root (ansible.cfg lives here):
+#   source .venv/bin/activate
+#   ansible-playbook ansible/site.yml --tags <role>
+
+ansible-core>=2.17
+hvac<2   # community.hashi_vault 7.x expects hvac 1.x response shapes; 2.x breaks the lookups
