@@ -29,9 +29,12 @@
   ansible.builtin.template:
     src: "{{ playbook_dir }}/../services/{{ compose_service }}/{{ item.src }}"
     dest: "{{ homelab_base_dir }}/services/{{ compose_service }}/{{ item.dest }}"
-    owner: "{{ deploy_user }}"
-    group: "{{ deploy_user }}"
-    mode: "{{ item.mode | default('0640') }}"
+    # Set preserve_perms: true on an item whose ownership/mode is managed by its own
+    # container (e.g. linuxserver images chown their bind-mounted config) — otherwise
+    # Ansible and the container fight over it and the file flaps changed every run.
+    owner: "{{ omit if (item.preserve_perms | default(false)) else deploy_user }}"
+    group: "{{ omit if (item.preserve_perms | default(false)) else deploy_user }}"
+    mode: "{{ omit if (item.preserve_perms | default(false)) else (item.mode | default('0640')) }}"
   loop: "{{ compose_templates }}"
   register: _compose_templates
 
