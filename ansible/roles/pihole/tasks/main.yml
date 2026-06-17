@@ -1,23 +1,10 @@
 ---
-- name: Create pihole directory
-  file:
-    path: "{{ homelab_base_dir }}/services/pihole"
-    state: directory
-    owner: "{{ deploy_user }}"
-    group: "{{ deploy_user }}"
-    mode: '0750'
-
-- name: Render docker-compose.yml
-  template:
-    src: "{{ playbook_dir }}/../services/pihole/docker-compose.yml.j2"
-    dest: "{{ homelab_base_dir }}/services/pihole/docker-compose.yml"
-    owner: "{{ deploy_user }}"
-    group: "{{ deploy_user }}"
-    mode: '0640'
-  notify: restart pihole
-
+# custom.list is bind-mounted into the container ({{ homelab_base_dir }}/services/pihole/
+# etc-pihole:/etc/pihole). Write it before the stack comes up so DNS is correct on first
+# start. This is managed outside compose_stack, so the restart below is gated on its change
+# (compose_stack only restarts on changes to its own templates).
 - name: Ensure pihole custom DNS directory exists
-  file:
+  ansible.builtin.file:
     path: "{{ homelab_base_dir }}/services/pihole/etc-pihole"
     state: directory
     owner: "{{ deploy_user }}"
@@ -25,16 +12,23 @@
     mode: '0750'
 
 - name: Add auth.{{ domain }} to Pi-hole custom DNS
-  lineinfile:
+  ansible.builtin.lineinfile:
     path: "{{ homelab_base_dir }}/services/pihole/etc-pihole/custom.list"
     line: "{{ minipc_ip }} auth.{{ domain }}"
     create: true
     state: present
-  notify: restart pihole
+  register: _pihole_custom_list
 
-- name: Ensure pihole stack is running
-  command:
-    cmd: docker compose up -d --remove-orphans
-    chdir: "{{ homelab_base_dir }}/services/pihole"
+- name: Deploy pihole compose stack
+  ansible.builtin.include_role:
+    name: compose_stack
+  vars:
+    compose_service: pihole
+
+- name: Restart pihole after custom DNS change
+  community.docker.docker_compose_v2:
+    project_src: "{{ homelab_base_dir }}/services/pihole"
+    state: restarted
+    services: [pihole]
   become_user: "{{ deploy_user }}"
-  changed_when: false
+  when: _pihole_custom_list is changed
