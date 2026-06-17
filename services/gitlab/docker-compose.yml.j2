@@ -93,16 +93,6 @@ services:
       - "traefik.http.services.gitlab.loadbalancer.server.port=80"
       - "traefik.docker.network=proxy"
 
-  gitlab-runner:
-    image: gitlab/gitlab-runner:latest
-    container_name: gitlab-runner
-    restart: unless-stopped
-    volumes:
-      - gitlab_runner_config:/etc/gitlab-runner
-      - /var/run/docker.sock:/var/run/docker.sock
-    networks:
-      - proxy
-
 networks:
   proxy:
     external: true
@@ -114,5 +104,3 @@ volumes:
     name: gitlab_logs
   gitlab_data:
     name: gitlab_data
-  gitlab_runner_config:
-    name: gitlab_runner_config
