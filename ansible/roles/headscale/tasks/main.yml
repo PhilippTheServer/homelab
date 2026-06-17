@@ -1,44 +1,16 @@
 ---
-- name: Create headscale directories
-  file:
-    path: "{{ homelab_base_dir }}/services/headscale/{{ item }}"
-    state: directory
-    owner: "{{ deploy_user }}"
-    group: "{{ deploy_user }}"
-    mode: '0750'
-  loop:
-    - ""
-    - config
-
-- name: Render docker-compose.yml
-  template:
-    src: "{{ playbook_dir }}/../services/headscale/docker-compose.yml.j2"
-    dest: "{{ homelab_base_dir }}/services/headscale/docker-compose.yml"
-    owner: "{{ deploy_user }}"
-    group: "{{ deploy_user }}"
-    mode: '0640'
-  notify: restart headscale
-
-- name: Render headscale config.yaml
-  template:
-    src: "{{ playbook_dir }}/../services/headscale/config.yaml.j2"
-    dest: "{{ homelab_base_dir }}/services/headscale/config/config.yaml"
-    owner: "{{ deploy_user }}"
-    group: "{{ deploy_user }}"
-    mode: '0640'
-  notify: restart headscale
-
-- name: Render headplane config.yaml
-  template:
-    src: "{{ playbook_dir }}/../services/headscale/headplane.yaml.j2"
-    dest: "{{ homelab_base_dir }}/services/headscale/headplane.yaml"
-    owner: "{{ deploy_user }}"
-    group: "{{ deploy_user }}"
-    mode: '0640'
-
-- name: Ensure headscale stack is running
-  command:
-    cmd: docker compose up -d --remove-orphans
-    chdir: "{{ homelab_base_dir }}/services/headscale"
-  become_user: "{{ deploy_user }}"
-  changed_when: false
+- name: Deploy headscale compose stack
+  ansible.builtin.include_role:
+    name: compose_stack
+  vars:
+    compose_service: headscale
+    compose_dirs: ["", "config"]
+    compose_templates:
+      - { src: config.yaml.j2, dest: config/config.yaml }
+      - { src: headplane.yaml.j2, dest: headplane.yaml }
+      - { src: docker-compose.yml.j2, dest: docker-compose.yml }
+    # config/ and headplane.yaml are bind-mounted read-only into both containers; restart
+    # them when a config file changes but the compose file itself did not. (The old role
+    # only restarted on config.yaml — headplane.yaml had no notify, a latent omission now
+    # covered here.)
+    compose_restart_services: ["headscale", "headplane"]
