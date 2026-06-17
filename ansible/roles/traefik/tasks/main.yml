@@ -1,50 +1,32 @@
 ---
-- name: Create traefik directories
-  file:
-    path: "{{ homelab_base_dir }}/services/traefik/{{ item }}"
-    state: directory
-    owner: "{{ deploy_user }}"
-    group: "{{ deploy_user }}"
-    mode: '0750'
-  loop:
-    - ""
-    - dynamic
-
-- name: Render docker-compose.yml
-  template:
-    src: "{{ playbook_dir }}/../services/traefik/docker-compose.yml.j2"
-    dest: "{{ homelab_base_dir }}/services/traefik/docker-compose.yml"
-    owner: "{{ deploy_user }}"
-    group: "{{ deploy_user }}"
-    mode: '0640'
-  notify: restart traefik
-
-- name: Render ddclient config
-  template:
-    src: "{{ playbook_dir }}/../services/traefik/ddclient.conf.j2"
-    dest: "{{ homelab_base_dir }}/services/traefik/ddclient.conf"
-    owner: "{{ deploy_user }}"
-    group: "{{ deploy_user }}"
-    mode: '0640'
-  notify: restart traefik
-
-- name: Render traefik dynamic TLS options
-  template:
-    src: "{{ playbook_dir }}/../services/traefik/dynamic/tls-options.yaml.j2"
-    dest: "{{ homelab_base_dir }}/services/traefik/dynamic/tls-options.yaml"
-    owner: "{{ deploy_user }}"
-    group: "{{ deploy_user }}"
-    mode: '0644'
-  notify: restart traefik
-
+# The proxy network must exist before traefik (and every other service) attaches to it.
 - name: Create proxy Docker network
   community.docker.docker_network:
     name: proxy
     state: present
 
-- name: Ensure traefik stack is running
-  command:
-    cmd: docker compose up -d --remove-orphans
-    chdir: "{{ homelab_base_dir }}/services/traefik"
-  become_user: "{{ deploy_user }}"
-  changed_when: false
+- name: Deploy traefik compose stack
+  ansible.builtin.include_role:
+    name: compose_stack
+  vars:
+    compose_service: traefik
+    compose_dirs: ["", "dynamic"]
+    compose_templates:
+      # ddclient (linuxserver image) chowns this bind-mounted file to its own uid on
+      # start, so we manage content only — preserve_perms avoids a perpetual flap.
+      - { src: ddclient.conf.j2, dest: ddclient.conf, preserve_perms: true }
+      - { src: dynamic/tls-options.yaml.j2, dest: dynamic/tls-options.yaml, mode: '0644' }
+      - { src: docker-compose.yml.j2, dest: docker-compose.yml }
+    # ddclient re-reads its config only on restart. traefik does NOT need a restart for
+    # dynamic/ changes — it hot-reloads them via `--providers.file.watch=true`, so we
+    # deliberately do not restart traefik here (avoids an ingress blip; the old handler
+    # force-recreated it on every config change).
+    compose_restart_services: ["ddclient"]
+
+# Confirm ingress is actually serving HTTPS (cheap no-op when already up; covers the
+# case where the deploy above recreated traefik on a compose change).
+- name: Wait for traefik to be serving HTTPS
+  ansible.builtin.wait_for:
+    port: 443
+    delay: 3
+    timeout: 30

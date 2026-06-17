@@ -36,7 +36,7 @@ Variables (set by the caller via `include_role: vars:`):
 | `compose_service` | — (**required**) | Service name; the repo dir `services/<name>/` and host dir `services/<name>/`. |
 | `compose_dirs` | `[""]` | Subdirs to create under the service dir (`""` = the dir itself). |
 | `compose_extra_dirs` | `[]` | Absolute dirs to create (e.g. media mounts outside `services/`). |
-| `compose_templates` | compose file only | List of `{src, dest, mode?}` templates to render. |
+| `compose_templates` | compose file only | List of `{src, dest, mode?, preserve_perms?}` templates to render. `preserve_perms: true` renders content only and leaves ownership/mode unmanaged — use when the file's perms are owned by its own container (e.g. linuxserver images chown their bind-mounted config). |
 | `compose_recreate` | `auto` | `docker_compose_v2` recreate policy. |
 | `compose_pull` | `missing` | Image pull policy (`missing` matches `docker compose up -d`). |
 | `compose_restart_services` | `[]` | Services to `restart` on config-file-only change. |
