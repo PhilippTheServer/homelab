@@ -9,6 +9,10 @@ compose_dirs: [""]
 # Absolute directories to create (siblings of services/, e.g. media mounts).
 compose_extra_dirs: []
 
+# Mode for all directories created by this role. Override to 0755 when a container user
+# (e.g. grafana uid 472) must traverse/read bind-mounted config dirs owned by deploy_user.
+compose_dir_mode: '0750'
+
 # Templates to render. `src` is relative to services/{{ compose_service }}/ in the repo;
 # `dest` is relative to the service dir on the host. `mode` defaults to 0640.
 compose_templates:

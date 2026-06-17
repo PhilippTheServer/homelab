@@ -1,86 +1,38 @@
 ---
-- name: Create monitoring config directories
-  file:
-    path: "{{ item }}"
-    state: directory
-    owner: "{{ deploy_user }}"
-    group: "{{ deploy_user }}"
-    mode: '0755'
-  loop:
-    - "{{ homelab_base_dir }}/services/monitoring"
-    - "{{ homelab_base_dir }}/services/monitoring/grafana/provisioning/datasources"
-    - "{{ homelab_base_dir }}/services/monitoring/grafana/provisioning/dashboards"
-    - "{{ homelab_base_dir }}/services/monitoring/grafana/dashboards"
-    - "{{ homelab_base_dir }}/services/monitoring/prometheus"
-    - "{{ homelab_base_dir }}/services/monitoring/loki"
-    - "{{ homelab_base_dir }}/services/monitoring/promtail"
-    - "{{ homelab_base_dir }}/services/monitoring/tempo"
+- name: Deploy monitoring compose stack
+  ansible.builtin.include_role:
+    name: compose_stack
+  vars:
+    compose_service: monitoring
+    # 0755 so container users (grafana uid 472, etc.) can traverse/read the bind-mounted
+    # config + provisioning dirs owned by deploy_user.
+    compose_dir_mode: '0755'
+    compose_dirs:
+      - ""
+      - grafana/provisioning/datasources
+      - grafana/provisioning/dashboards
+      - grafana/dashboards
+      - prometheus
+      - loki
+      - promtail
+      - tempo
+    compose_templates:
+      - { src: prometheus/prometheus.yml.j2, dest: prometheus/prometheus.yml, mode: '0644' }
+      - { src: loki/loki.yml.j2, dest: loki/loki.yml, mode: '0644' }
+      - { src: promtail/promtail.yml.j2, dest: promtail/promtail.yml, mode: '0644' }
+      - { src: tempo/tempo.yml.j2, dest: tempo/tempo.yml, mode: '0644' }
+      - { src: grafana/provisioning/datasources/datasources.yml.j2, dest: grafana/provisioning/datasources/datasources.yml, mode: '0644' }
+      - { src: grafana/provisioning/dashboards/dashboards.yml.j2, dest: grafana/provisioning/dashboards/dashboards.yml, mode: '0644' }
+      - { src: docker-compose.yml.j2, dest: docker-compose.yml }
+    # These services read bind-mounted config files; restart them when a config-only
+    # change occurs (compose file unchanged). Grafana dashboards are auto-reloaded by the
+    # provisioning provider, so dashboard JSON changes (below) need no restart.
+    compose_restart_services: [prometheus, loki, promtail, tempo, grafana]
 
-- name: Render docker-compose.yml
-  template:
-    src: "{{ playbook_dir }}/../services/monitoring/docker-compose.yml.j2"
-    dest: "{{ homelab_base_dir }}/services/monitoring/docker-compose.yml"
-    owner: "{{ deploy_user }}"
-    group: "{{ deploy_user }}"
-    mode: '0640'
-  notify: restart monitoring
-
-- name: Render prometheus.yml
-  template:
-    src: "{{ playbook_dir }}/../services/monitoring/prometheus/prometheus.yml.j2"
-    dest: "{{ homelab_base_dir }}/services/monitoring/prometheus/prometheus.yml"
-    owner: "{{ deploy_user }}"
-    group: "{{ deploy_user }}"
-    mode: '0644'
-  notify: restart monitoring
-
-- name: Render loki.yml
-  template:
-    src: "{{ playbook_dir }}/../services/monitoring/loki/loki.yml.j2"
-    dest: "{{ homelab_base_dir }}/services/monitoring/loki/loki.yml"
-    owner: "{{ deploy_user }}"
-    group: "{{ deploy_user }}"
-    mode: '0644'
-  notify: restart monitoring
-
-- name: Render promtail.yml
-  template:
-    src: "{{ playbook_dir }}/../services/monitoring/promtail/promtail.yml.j2"
-    dest: "{{ homelab_base_dir }}/services/monitoring/promtail/promtail.yml"
-    owner: "{{ deploy_user }}"
-    group: "{{ deploy_user }}"
-    mode: '0644'
-  notify: restart monitoring
-
-- name: Render tempo.yml
-  template:
-    src: "{{ playbook_dir }}/../services/monitoring/tempo/tempo.yml.j2"
-    dest: "{{ homelab_base_dir }}/services/monitoring/tempo/tempo.yml"
-    owner: "{{ deploy_user }}"
-    group: "{{ deploy_user }}"
-    mode: '0644'
-  notify: restart monitoring
-
-- name: Render Grafana datasources provisioning
-  template:
-    src: "{{ playbook_dir }}/../services/monitoring/grafana/provisioning/datasources/datasources.yml.j2"
-    dest: "{{ homelab_base_dir }}/services/monitoring/grafana/provisioning/datasources/datasources.yml"
-    owner: "{{ deploy_user }}"
-    group: "{{ deploy_user }}"
-    mode: '0644'
-  notify: restart monitoring
-
-- name: Render Grafana dashboard provider config
-  template:
-    src: "{{ playbook_dir }}/../services/monitoring/grafana/provisioning/dashboards/dashboards.yml.j2"
-    dest: "{{ homelab_base_dir }}/services/monitoring/grafana/provisioning/dashboards/dashboards.yml"
-    owner: "{{ deploy_user }}"
-    group: "{{ deploy_user }}"
-    mode: '0644'
-  notify: restart monitoring
-
+# Grafana dashboards — provisioned from disk and hot-reloaded by Grafana, so no restart.
+# Kept bespoke (copy + downloads + JSON fix-ups don't fit the template pattern).
 - name: Copy Container Logs dashboard
-  copy:
+  ansible.builtin.copy:
     src: "{{ playbook_dir }}/../services/monitoring/grafana/dashboards/container-logs.json"
     dest: "{{ homelab_base_dir }}/services/monitoring/grafana/dashboards/container-logs.json"
     owner: "{{ deploy_user }}"
@@ -88,41 +40,39 @@
     mode: '0644'
 
 - name: Download Node Exporter Full dashboard
-  get_url:
+  ansible.builtin.get_url:
     url: "https://grafana.com/api/dashboards/1860/revisions/latest/download"
     dest: "{{ homelab_base_dir }}/services/monitoring/grafana/dashboards/node-exporter-full.json"
     mode: '0644'
     force: false
 
 - name: Download Traefik v3 dashboard
-  get_url:
+  ansible.builtin.get_url:
     url: "https://grafana.com/api/dashboards/17346/revisions/latest/download"
     dest: "{{ homelab_base_dir }}/services/monitoring/grafana/dashboards/traefik.json"
     mode: '0644'
     force: false
 
-- name: Download Traefik Loki dashboard
-  get_url:
+# Download the upstream dashboard to an UNMODIFIED staging file, then write the fixed
+# version deterministically. Modifying a get_url dest in place is non-idempotent: get_url
+# re-downloads + compares, sees the in-place edits, and overwrites — flapping every run
+# (a latent bug in the original role). Computing the output from a stable source fixes it.
+- name: Download Traefik Loki dashboard (upstream, unmodified)
+  ansible.builtin.get_url:
     url: "https://grafana.com/api/dashboards/13713/revisions/latest/download"
-    dest: "{{ homelab_base_dir }}/services/monitoring/grafana/dashboards/traefik-loki.json"
+    dest: "{{ homelab_base_dir }}/services/monitoring/grafana/dashboards/.traefik-loki.upstream.json"
     mode: '0644'
     force: false
 
-- name: Fix Traefik Loki dashboard datasource placeholder
-  replace:
-    path: "{{ homelab_base_dir }}/services/monitoring/grafana/dashboards/traefik-loki.json"
-    regexp: '\$\{DS_LOKI\}'
-    replace: 'loki'
+- name: Read upstream Traefik Loki dashboard
+  ansible.builtin.slurp:
+    src: "{{ homelab_base_dir }}/services/monitoring/grafana/dashboards/.traefik-loki.upstream.json"
+  register: _traefik_loki_raw
 
-- name: Fix Traefik Loki dashboard job selector (file path → Docker label)
-  replace:
-    path: "{{ homelab_base_dir }}/services/monitoring/grafana/dashboards/traefik-loki.json"
-    regexp: '/var/log/traefik\.log'
-    replace: 'traefik'
-
-- name: Ensure monitoring stack is running
-  command:
-    cmd: docker compose up -d --remove-orphans
-    chdir: "{{ homelab_base_dir }}/services/monitoring"
-  become_user: "{{ deploy_user }}"
-  changed_when: false
+- name: Write fixed Traefik Loki dashboard (datasource placeholder + job selector)
+  ansible.builtin.copy:
+    dest: "{{ homelab_base_dir }}/services/monitoring/grafana/dashboards/traefik-loki.json"
+    content: "{{ _traefik_loki_raw.content | b64decode | regex_replace('\\$\\{DS_LOKI\\}', 'loki') | regex_replace('/var/log/traefik\\.log', 'traefik') }}"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: '0644'
