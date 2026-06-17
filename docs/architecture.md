@@ -125,7 +125,7 @@ Each stack is an independent Docker Compose file with its own database.
 - **Role:** Git hosting, CI/CD pipelines, IaC source of truth after bootstrap
 - **Auth:** OIDC via Keycloak
 - **Database:** Dedicated Postgres + Redis containers in the same stack
-- **Runners:** GitLab Runner container, 1–2 concurrent builds (16 GB RAM constraint)
+- **Runners:** Provisioned separately — no runner ships in this stack
 - **Compose:** `services/gitlab/docker-compose.yml`
 
 ### Harbor (Priority 4)
@@ -266,7 +266,7 @@ Pi-hole DNS → Mini PC LAN IP → Traefik → service
 
 ### CI/CD pipeline
 ```
-git push → GitLab → Runner builds image → pushes to Harbor
+git push → GitLab → (external) Runner builds image → pushes to Harbor
 GitLab CI → AppRole login to Vault → fetch secrets → ansible-playbook → docker compose pull + up → service updated
 ```
 

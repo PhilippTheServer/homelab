@@ -146,24 +146,6 @@ ansible-playbook ansible/site.yml --tags pihole
 
 ---
 
-## Check GitLab Runner Status
-
-```bash
-ssh philipp@192.168.178.20
-docker exec -it gitlab-runner gitlab-runner list
-docker exec -it gitlab-runner gitlab-runner verify
-```
-
-If the runner is stuck or needs re-registration:
-```bash
-docker exec -it gitlab-runner gitlab-runner register \
-  --url https://gitlab.home.philippthesurfer.com \
-  --executor docker \
-  --docker-image alpine
-```
-
----
-
 ## Force Cert Renewal (Let's Encrypt)
 
 Traefik renews automatically ~30 days before expiry. To force an immediate renewal:

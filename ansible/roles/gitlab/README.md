@@ -4,7 +4,7 @@ Git hosting and CI/CD pipelines.
 
 ## Overview
 
-GitLab CE provides the primary Git remote and CI/CD system for the homelab. After initial bootstrap, GitLab CI takes over redeployment duties: on every push to `main`, a pipeline authenticates to HashiCorp Vault via AppRole, fetches secrets, and runs the Ansible playbook — so Ansible on a local machine is only needed for host-level changes. A GitLab Runner container runs in Docker executor mode (Docker socket mounted) alongside GitLab. Self-registration is disabled; all login goes through Keycloak OIDC. SSH access for `git push/pull` is on port 2222 to avoid conflicting with the host SSH daemon.
+GitLab CE provides the primary Git remote and CI/CD system for the homelab. After initial bootstrap, GitLab CI takes over redeployment duties: on every push to `main`, a pipeline authenticates to HashiCorp Vault via AppRole, fetches secrets, and runs the Ansible playbook — so Ansible on a local machine is only needed for host-level changes. CI jobs require a separately provisioned GitLab Runner; no runner is deployed by this role. Self-registration is disabled; all login goes through Keycloak OIDC. SSH access for `git push/pull` is on port 2222 to avoid conflicting with the host SSH daemon.
 
 ## Prerequisites
 
@@ -17,7 +17,6 @@ GitLab CE provides the primary Git remote and CI/CD system for the homelab. Afte
 | Container | Image | Purpose |
 |---|---|---|
 | `gitlab` | `gitlab/gitlab-ce:19.0.2-ce.0` | GitLab application server |
-| `gitlab-runner` | `gitlab/gitlab-runner:latest` | CI/CD job executor |
 
 ## Configuration
 
@@ -54,14 +53,7 @@ ansible-playbook ansible/site.yml --tags gitlab
 
 **Initial startup is slow.** GitLab CE typically takes 3–5 minutes to become responsive on first boot while it initializes the database and assets. Monitor with `docker logs -f gitlab`.
 
-**Runner registration** must be done manually after GitLab is running. Get the registration token from GitLab admin → CI/CD → Runners, then register the runner:
-
-```bash
-docker exec -it gitlab-runner gitlab-runner register \
-  --url https://gitlab.home.philippthesurfer.com \
-  --executor docker \
-  --docker-image alpine
-```
+**CI/CD runners** are not deployed by this role. Provision a GitLab Runner separately and register it against this instance before pipelines can run.
 
 **Admin access** must be granted manually — GitLab CE 19 does not support automatic admin promotion via OIDC group membership (`omniauth_admin_groups` was removed in GitLab 16.1). Use the Rails runner or log in as `root`:
 
