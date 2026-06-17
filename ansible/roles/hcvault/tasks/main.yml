@@ -1,43 +1,24 @@
 ---
-- name: Create hcvault directories
-  file:
-    path: "{{ homelab_base_dir }}/services/hcvault/{{ item }}"
-    state: directory
-    owner: "{{ deploy_user }}"
-    group: "{{ deploy_user }}"
-    mode: '0750'
-  loop:
-    - ""
-    - config
-
-- name: Render docker-compose.yml
-  template:
-    src: "{{ playbook_dir }}/../services/hcvault/docker-compose.yml.j2"
-    dest: "{{ homelab_base_dir }}/services/hcvault/docker-compose.yml"
-    owner: "{{ deploy_user }}"
-    group: "{{ deploy_user }}"
-    mode: '0640'
-  notify: restart hcvault
-
-- name: Render vault.hcl config
-  template:
-    src: "{{ playbook_dir }}/../services/hcvault/vault.hcl.j2"
-    dest: "{{ homelab_base_dir }}/services/hcvault/config/vault.hcl"
-    owner: "{{ deploy_user }}"
-    group: "{{ deploy_user }}"
-    mode: '0640'
-  notify: restart hcvault
-
+# Vault runs as uid 100; ensure the data volume is owned correctly before the stack
+# starts. This `docker run` also creates the vault_data volume on a fresh host.
+# Must run BEFORE the compose deploy below.
 - name: Fix vault data volume ownership (vault runs as uid 100)
-  command: docker run --rm -v vault_data:/vault/data busybox chown -R 100:1000 /vault/data
+  ansible.builtin.command: docker run --rm -v vault_data:/vault/data busybox chown -R 100:1000 /vault/data
   changed_when: false
 
-- name: Ensure hcvault stack is running
-  command:
-    cmd: docker compose up -d --remove-orphans
-    chdir: "{{ homelab_base_dir }}/services/hcvault"
-  become_user: "{{ deploy_user }}"
-  changed_when: false
+- name: Deploy hcvault compose stack
+  ansible.builtin.include_role:
+    name: compose_stack
+  vars:
+    compose_service: hcvault
+    compose_dirs: ["", "config"]
+    compose_templates:
+      - { src: vault.hcl.j2, dest: config/vault.hcl }
+      - { src: docker-compose.yml.j2, dest: docker-compose.yml }
+    # vault.hcl is bind-mounted read-only into the container. NOTE: restarting (or
+    # recreating) Vault makes it come back SEALED and require a manual unseal — this
+    # mirrors the old `restart hcvault` handler's behaviour on a config change.
+    compose_restart_services: ["vault"]
 
 - name: Configure Vault (engines, auth, policies, SSH CA)
-  import_tasks: configure.yml
+  ansible.builtin.import_tasks: configure.yml

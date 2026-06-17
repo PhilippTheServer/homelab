@@ -1,10 +1,6 @@
 ---
-- name: restart hcvault
-  command:
-    cmd: docker compose up -d --force-recreate --remove-orphans
-    chdir: "{{ homelab_base_dir }}/services/hcvault"
-  become_user: "{{ deploy_user }}"
-
+# `restart hcvault` was removed when this role moved to the compose_stack pattern;
+# compose convergence + compose_restart_services handle Vault restarts now.
 - name: restart sshd
   service:
     name: sshd

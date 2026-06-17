@@ -37,7 +37,7 @@
     oidc_client_id="hcvault"
     oidc_client_secret="{{ vault_hcvault_oidc_secret }}"
     default_role="admin"
-  changed_when: true
+  changed_when: false  # declarative `vault write` (re-applying identical config is a no-op; the CLI gives no created-vs-updated signal)
 
 - name: Configure OIDC admin role
   shell: |
@@ -50,7 +50,7 @@
       user_claim="sub" \
       token_policies="admin" \
       token_ttl="8h"
-  changed_when: true
+  changed_when: false  # declarative `vault write` (re-applying identical config is a no-op; the CLI gives no created-vs-updated signal)
 
 - name: Write admin policy
   shell: |
@@ -61,7 +61,7 @@
       capabilities = ["create", "read", "update", "delete", "list", "sudo"]
     }
     EOF
-  changed_when: true
+  changed_when: false  # declarative `vault write` (re-applying identical config is a no-op; the CLI gives no created-vs-updated signal)
 
 - name: Write ci-cd policy
   shell: |
@@ -81,7 +81,7 @@
       capabilities = ["create", "update"]
     }
     EOF
-  changed_when: true
+  changed_when: false  # declarative `vault write` (re-applying identical config is a no-op; the CLI gives no created-vs-updated signal)
 
 - name: Enable AppRole auth method
   shell: >
@@ -101,7 +101,7 @@
     token_ttl="1h"
     token_max_ttl="4h"
     secret_id_ttl="0"
-  changed_when: true
+  changed_when: false  # declarative `vault write` (re-applying identical config is a no-op; the CLI gives no created-vs-updated signal)
 
 - name: Enable SSH secrets engine
   shell: >
@@ -132,7 +132,7 @@
     ttl=30m
     max_ttl=1h
     allow_user_certificates=true
-  changed_when: true
+  changed_when: false  # declarative `vault write` (re-applying identical config is a no-op; the CLI gives no created-vs-updated signal)
 
 - name: Create SSH signing role for users
   shell: |
@@ -152,7 +152,7 @@
       }
     }
     EOF
-  changed_when: true
+  changed_when: false  # declarative `vault write` (re-applying identical config is a no-op; the CLI gives no created-vs-updated signal)
 
 - name: Read Vault SSH CA public key
   shell: >
