@@ -1,6 +1,9 @@
 ---
+# The import dir must exist before the realm JSON is rendered, and the realm JSON must
+# exist before the stack starts (--import-realm reads it at first boot), so dirs + realm
+# render stay bespoke ahead of the compose_stack deploy.
 - name: Create keycloak directories
-  file:
+  ansible.builtin.file:
     path: "{{ item }}"
     state: directory
     owner: "{{ deploy_user }}"
@@ -11,7 +14,7 @@
     - "{{ homelab_base_dir }}/services/keycloak/import"
 
 - name: Render realm import JSON
-  template:
+  ansible.builtin.template:
     src: "{{ playbook_dir }}/../services/keycloak/realm-homelab.json.j2"
     dest: "{{ homelab_base_dir }}/services/keycloak/import/realm-homelab.json"
     owner: "{{ deploy_user }}"
@@ -19,21 +22,11 @@
     mode: '0640'
   register: _realm_template
 
-- name: Render docker-compose.yml
-  template:
-    src: "{{ playbook_dir }}/../services/keycloak/docker-compose.yml.j2"
-    dest: "{{ homelab_base_dir }}/services/keycloak/docker-compose.yml"
-    owner: "{{ deploy_user }}"
-    group: "{{ deploy_user }}"
-    mode: '0640'
-  notify: restart keycloak
-
-- name: Ensure keycloak stack is running
-  command:
-    cmd: docker compose up -d --remove-orphans
-    chdir: "{{ homelab_base_dir }}/services/keycloak"
-  become_user: "{{ deploy_user }}"
-  changed_when: false
+- name: Deploy keycloak compose stack
+  ansible.builtin.include_role:
+    name: compose_stack
+  vars:
+    compose_service: keycloak
 
 # --import-realm at startup only runs when the realm does not yet exist in the DB
 # (IGNORE_EXISTING strategy). When the realm template changes on a running instance,
@@ -52,6 +45,7 @@
           password: "{{ vault_keycloak_admin_password }}"
           grant_type: password
       register: _kc_token_sync
+      changed_when: false
       no_log: true
 
     - name: Read rendered realm JSON
@@ -152,9 +146,9 @@
         status_code: 204
       no_log: true
 
-# Scope assignments and group management run on every play — the Keycloak client PUT
-# endpoint silently ignores defaultClientScopes, so scopes must be assigned via a
-# dedicated endpoint. PUT to add a scope and POST a group are both idempotent.
+# Scope assignments and group management run on every play. They are made idempotent
+# below: the groups-scope PUT is gated on a pre-GET, and the group POST treats 409
+# (already exists) as unchanged.
 - name: Ensure Keycloak realm state (scopes + groups)
   block:
     - name: Get admin token (realm state)
@@ -168,6 +162,7 @@
           password: "{{ vault_keycloak_admin_password }}"
           grant_type: password
       register: _kc_token
+      changed_when: false
       no_log: true
 
     - name: Get existing homelab clients (realm state)
@@ -193,6 +188,14 @@
       set_fact:
         _groups_scope_id: "{{ (_client_scopes.json | selectattr('name', 'equalto', 'groups') | list | first).id }}"
 
+    - name: Get gitlab client default scopes
+      uri:
+        url: "https://auth.{{ domain }}/admin/realms/homelab/clients/{{ _client_id_map_state['gitlab'] }}/default-client-scopes"
+        headers:
+          Authorization: "Bearer {{ _kc_token.json.access_token }}"
+      register: _gitlab_default_scopes
+      when: "'gitlab' in _client_id_map_state"
+
     - name: Add groups scope to gitlab client default scopes
       uri:
         url: "https://auth.{{ domain }}/admin/realms/homelab/clients/{{ _client_id_map_state['gitlab'] }}/default-client-scopes/{{ _groups_scope_id }}"
@@ -200,7 +203,9 @@
         headers:
           Authorization: "Bearer {{ _kc_token.json.access_token }}"
         status_code: [204]
-      when: "'gitlab' in _client_id_map_state"
+      when:
+        - "'gitlab' in _client_id_map_state"
+        - "'groups' not in (_gitlab_default_scopes.json | default([]) | map(attribute='name') | list)"
 
     - name: Ensure gitlab-admins group exists
       uri:
@@ -212,3 +217,5 @@
           name: "gitlab-admins"
         body_format: json
         status_code: [201, 409]
+      register: _gitlab_admins_group
+      changed_when: _gitlab_admins_group.status == 201

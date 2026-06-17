@@ -1,6 +1,0 @@
----
-- name: restart keycloak
-  command:
-    cmd: docker compose up -d --force-recreate --remove-orphans
-    chdir: "{{ homelab_base_dir }}/services/keycloak"
-  become_user: "{{ deploy_user }}"
