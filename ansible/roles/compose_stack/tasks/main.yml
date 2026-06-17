@@ -13,7 +13,7 @@
     state: directory
     owner: "{{ deploy_user }}"
     group: "{{ deploy_user }}"
-    mode: '0750'
+    mode: "{{ compose_dir_mode }}"
   loop: "{{ compose_dirs }}"
 
 - name: "{{ compose_service }} | create extra (absolute) directories"
@@ -22,7 +22,7 @@
     state: directory
     owner: "{{ deploy_user }}"
     group: "{{ deploy_user }}"
-    mode: '0750'
+    mode: "{{ compose_dir_mode }}"
   loop: "{{ compose_extra_dirs }}"
 
 - name: "{{ compose_service }} | render templates"
