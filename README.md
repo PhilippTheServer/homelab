@@ -81,7 +81,7 @@ from the repo root (where `ansible.cfg` lives):
 
 ```bash
 python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt                       # ansible-core + hvac<2
+.venv/bin/pip install -r requirements.txt                       # ansible-core + hvac (latest, pinned)
 .venv/bin/ansible-galaxy collection install -r ansible/requirements.yml
 source .venv/bin/activate
 ```
