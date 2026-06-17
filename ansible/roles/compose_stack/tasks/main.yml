@@ -1,0 +1,58 @@
+---
+- name: "compose_stack | assert compose_service is set"
+  ansible.builtin.assert:
+    that:
+      - compose_service is defined
+      - compose_service | length > 0
+    fail_msg: "compose_stack requires the 'compose_service' variable to be set"
+    quiet: true
+
+- name: "{{ compose_service }} | create service directories"
+  ansible.builtin.file:
+    path: "{{ homelab_base_dir }}/services/{{ compose_service }}/{{ item }}"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: '0750'
+  loop: "{{ compose_dirs }}"
+
+- name: "{{ compose_service }} | create extra (absolute) directories"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: '0750'
+  loop: "{{ compose_extra_dirs }}"
+
+- name: "{{ compose_service }} | render templates"
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/../services/{{ compose_service }}/{{ item.src }}"
+    dest: "{{ homelab_base_dir }}/services/{{ compose_service }}/{{ item.dest }}"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: "{{ item.mode | default('0640') }}"
+  loop: "{{ compose_templates }}"
+  register: _compose_templates
+
+- name: "{{ compose_service }} | deploy stack"
+  community.docker.docker_compose_v2:
+    project_src: "{{ homelab_base_dir }}/services/{{ compose_service }}"
+    recreate: "{{ compose_recreate }}"
+    pull: "{{ compose_pull }}"
+    remove_orphans: true
+  become_user: "{{ deploy_user }}"
+  register: _compose_up
+
+# When only a bind-mounted config file changed (compose file unchanged, so the deploy
+# above did not recreate anything), restart the affected services so they re-read it.
+- name: "{{ compose_service }} | restart services after config-only change"
+  community.docker.docker_compose_v2:
+    project_src: "{{ homelab_base_dir }}/services/{{ compose_service }}"
+    state: restarted
+    services: "{{ compose_restart_services }}"
+  become_user: "{{ deploy_user }}"
+  when:
+    - compose_restart_services | length > 0
+    - _compose_templates is changed
+    - not (_compose_up is changed)

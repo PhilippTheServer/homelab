@@ -17,7 +17,7 @@ export OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES  # add to ~/.zshrc to make perman
 # client (required by the community.hashi_vault lookups) go here — the system
 # Python is usually PEP 668 externally managed, so don't install globally.
 python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt          # ansible-core + hvac<2
+.venv/bin/pip install -r requirements.txt          # ansible-core + hvac (latest, pinned)
 
 # Install the Ansible collections into the venv's reach
 .venv/bin/ansible-galaxy collection install -r ansible/requirements.yml
@@ -26,10 +26,11 @@ python3 -m venv .venv
 source .venv/bin/activate
 ```
 
-> `requirements.txt` pins `hvac<2` on purpose — hvac 2.x changed response types
-> and breaks community.hashi_vault 7.x lookups. If `python3 -m venv` complains
-> that `ensurepip` is unavailable, install your distro's venv package first
-> (e.g. `apt install python3-venv`).
+> `requirements.txt` and `ansible/requirements.yml` pin exact versions and track
+> the latest releases (hvac 2.x is verified working with community.hashi_vault 7.x).
+> Bump deliberately: `pip install -U` / `ansible-galaxy collection install --force`,
+> then update the pins. If `python3 -m venv` complains that `ensurepip` is
+> unavailable, install your distro's venv package first (e.g. `apt install python3-venv`).
 
 ---
 

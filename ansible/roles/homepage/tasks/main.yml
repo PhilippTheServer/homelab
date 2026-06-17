@@ -1,18 +1,16 @@
 ---
-- name: Create homepage directories
-  file:
-    path: "{{ item }}"
+# Ensure the images dir exists before downloading the wallpaper (get_url does not
+# create parent dirs). compose_stack re-creates it idempotently during deploy.
+- name: Ensure homepage images directory exists
+  ansible.builtin.file:
+    path: "{{ homelab_base_dir }}/services/homepage/images"
     state: directory
     owner: "{{ deploy_user }}"
     group: "{{ deploy_user }}"
     mode: '0750'
-  loop:
-    - "{{ homelab_base_dir }}/services/homepage"
-    - "{{ homelab_base_dir }}/services/homepage/config"
-    - "{{ homelab_base_dir }}/services/homepage/images"
 
 - name: Download background wallpaper
-  get_url:
+  ansible.builtin.get_url:
     url: https://wallpapercave.com/wp/wp8982796.jpg
     dest: "{{ homelab_base_dir }}/services/homepage/images/background.jpg"
     owner: "{{ deploy_user }}"
@@ -20,63 +18,19 @@
     mode: '0640'
     force: false
 
-- name: Render settings.yaml
-  template:
-    src: "{{ playbook_dir }}/../services/homepage/config/settings.yaml.j2"
-    dest: "{{ homelab_base_dir }}/services/homepage/config/settings.yaml"
-    owner: "{{ deploy_user }}"
-    group: "{{ deploy_user }}"
-    mode: '0640'
-  notify: restart homepage
-
-- name: Render services.yaml
-  template:
-    src: "{{ playbook_dir }}/../services/homepage/config/services.yaml.j2"
-    dest: "{{ homelab_base_dir }}/services/homepage/config/services.yaml"
-    owner: "{{ deploy_user }}"
-    group: "{{ deploy_user }}"
-    mode: '0640'
-  notify: restart homepage
-
-- name: Render widgets.yaml
-  template:
-    src: "{{ playbook_dir }}/../services/homepage/config/widgets.yaml.j2"
-    dest: "{{ homelab_base_dir }}/services/homepage/config/widgets.yaml"
-    owner: "{{ deploy_user }}"
-    group: "{{ deploy_user }}"
-    mode: '0640'
-  notify: restart homepage
-
-- name: Render bookmarks.yaml
-  template:
-    src: "{{ playbook_dir }}/../services/homepage/config/bookmarks.yaml.j2"
-    dest: "{{ homelab_base_dir }}/services/homepage/config/bookmarks.yaml"
-    owner: "{{ deploy_user }}"
-    group: "{{ deploy_user }}"
-    mode: '0640'
-  notify: restart homepage
-
-- name: Render docker.yaml
-  template:
-    src: "{{ playbook_dir }}/../services/homepage/config/docker.yaml.j2"
-    dest: "{{ homelab_base_dir }}/services/homepage/config/docker.yaml"
-    owner: "{{ deploy_user }}"
-    group: "{{ deploy_user }}"
-    mode: '0640'
-  notify: restart homepage
-
-- name: Render docker-compose.yml
-  template:
-    src: "{{ playbook_dir }}/../services/homepage/docker-compose.yml.j2"
-    dest: "{{ homelab_base_dir }}/services/homepage/docker-compose.yml"
-    owner: "{{ deploy_user }}"
-    group: "{{ deploy_user }}"
-    mode: '0640'
-  notify: restart homepage
-
-- name: Ensure homepage stack is running
-  command:
-    cmd: docker compose up -d --remove-orphans
-    chdir: "{{ homelab_base_dir }}/services/homepage"
-  become_user: "{{ deploy_user }}"
-  changed_when: false
+- name: Deploy homepage compose stack
+  ansible.builtin.include_role:
+    name: compose_stack
+  vars:
+    compose_service: homepage
+    compose_dirs: ["", "config", "images"]
+    compose_templates:
+      - { src: config/settings.yaml.j2, dest: config/settings.yaml }
+      - { src: config/services.yaml.j2, dest: config/services.yaml }
+      - { src: config/widgets.yaml.j2, dest: config/widgets.yaml }
+      - { src: config/bookmarks.yaml.j2, dest: config/bookmarks.yaml }
+      - { src: config/docker.yaml.j2, dest: config/docker.yaml }
+      - { src: docker-compose.yml.j2, dest: docker-compose.yml }
+    # homepage re-reads its config on restart (not recreate) — matches the old
+    # `docker compose restart homepage` handler.
+    compose_restart_services: ["homepage"]

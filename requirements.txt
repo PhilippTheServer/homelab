@@ -10,5 +10,9 @@
 #   source .venv/bin/activate
 #   ansible-playbook ansible/site.yml --tags <role>
 
-ansible-core>=2.17
-hvac<2   # community.hashi_vault 7.x expects hvac 1.x response shapes; 2.x breaks the lookups
+# Pinned to the latest released versions (policy: track latest, bump deliberately).
+# To bump: `pip install -U ansible-core hvac` then update the pins to match.
+# Note: hvac 2.x is verified working with community.hashi_vault 7.x (the old
+# `hvac<2` cap was an obsolete workaround and has been removed).
+ansible-core==2.21.0
+hvac==2.4.0
